@@ -1,68 +1,62 @@
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <termios.h>
 #include <unistd.h>
 
+#include "terminal.h"
+#include "util.h"
 
-/* entry_term contains a snapshot of the termios settings at startup. */
-struct termios	entry_term;
 
-
-/*
- * A text editor needs the terminal to be in raw mode; but the default
- * is to be in canonical (cooked) mode, which is a buffered input mode.
- */
-
-static void
-enable_termraw()
+void
+loop()
 {
-	struct termios	raw;
+	char	c;
+	int	command = 0;
 
-	/* Read the current terminal parameters for standard input. */
-	tcgetattr(STDIN_FILENO, &raw);
+	while (1) {
+		c = '\0';
+		/*
+		 * Note that Cygwin, apparently, will treat a read time-
+		 * out as an error with errno == EAGAIN. I don't really
+		 * have any interest in supporting code for Cygwin.
+		 */
+		if ((read(STDIN_FILENO, &c, 1) == -1)) {
+			die("failed to read from the terminal");
+		}
 
-	/*
-	 * Turn off the local ECHO mode, which we need to do in raw mode
-	 * because what gets displayed is going to need extra control.
-	 *
-	 * NOTE(kyle): look into cfmakeraw, which will require
-	 * snapshotting.
-	 */
-	raw.c_lflag &= ~(ECHO|ICANON);
+		if (c == 0x00) {
+			continue;
+		}
 
-	/*
-	 * Now write the terminal parameters to the current terminal,
-	 * after flushing any waiting input out.
-	 */
-	tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-}
+		if (command && ((c == 'q') || (c == 0x11))) {
+			break;
+		}
 
+		if (c == 0x0b) {
+			if (!command) {
+				command = 1;
+				continue;
+			}
+		} else {
+			command = 0;
+		}
 
-static void
-disable_termraw()
-{
-	tcsetattr(STDIN_FILENO, TCSAFLUSH, &entry_term);
+		if (iscntrl(c)) {
+			printf("%02x\r\n", c);
+		} else {
+			printf("%02x ('%c')\r\n", c, c);
+		}
+	}
 }
 
 
 int
 main()
 {
-	char	c;
-
-	/* prepare the terminal */
-	tcgetattr(STDIN_FILENO, &entry_term);
-	atexit(disable_termraw);
-	enable_termraw();
-
-	while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q') {
-		if (iscntrl(c)) {
-			printf("%02x\n", c);
-		} else {
-			printf("%02x ('%c')\n", c, c);
-		}
-	}
+	setup_terminal();
+	loop();
 
 	return 0;
 }

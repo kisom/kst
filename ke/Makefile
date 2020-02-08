@@ -1,5 +1,5 @@
 BIN :=		ke
-OBJS :=		main.o
+OBJS :=		main.o terminal.o util.o
 
 LDFLAGS :=	-static
 CFLAGS :=	-pedantic -Wall -Werror -Wextra -O2 -std=c99
@@ -16,6 +16,7 @@ clean:
 
 .PHONY: run
 run: $(BIN)
+	reset
 	./$(BIN)
 
 %.o: %.c
