@@ -7,10 +7,6 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include "keys.h"
-#include "terminal.h"
-#include "util.h"
-
 
 #define ESCSEQ		"\x1b["
 #define	CTRL_KEY(key)	((key)&0x1f)
