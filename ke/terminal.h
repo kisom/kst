@@ -3,6 +3,7 @@
 
 
 void	setup_terminal();
+void	display_clear();
 
 
 #endif /* KE_TERMINAL_H */

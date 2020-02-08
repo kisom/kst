@@ -1,0 +1,87 @@
+static void
+enable_termraw()
+{
+	struct termios	raw;
+
+	/* Read the current terminal parameters for standard input. */
+	if (tcgetattr(STDIN_FILENO, &raw) == -1) {
+		die("tcgetattr while enabling raw mode");
+	}
+
+	/*
+	 * Turn off software flow control. IXON: disable flow control,
+	 * so named because XON and XOFF :)
+	 *
+	 * ICRNL: Don't interpret carriage returns as newlines.
+	 *
+	 * raw.c_iflag &= ~(ICRNL|IXON|BRKINT|INPCK|ISTRIP);
+	 */
+
+	/*
+	 * Turn off the terminal's conversion of newlines -> carriage
+	 * return + newline.
+	 *
+	 * raw.c_oflag &= ~(OPOST);
+	 */
+
+	/*
+	 * Turn off the local ECHO mode, which we need to do in raw mode
+	 * because what gets displayed is going to need extra control.
+	 *
+	 * ICANON: Turn off canonical mode.
+	 *
+	 * ISIG: Turn off SIGINT / SIGSTP processing.
+	 *
+	 * IEXTEN: turn off ^v processing.
+	 *
+	 * NOTE(kyle): look into cfmakeraw, which will require
+	 * snapshotting. However, this skips all the notes about what
+	 * it takes to put the terminal in raw mode.
+	 *
+	 * raw.c_lflag &= ~(ECHO|ICANON|ISIG|IEXTEN);
+	 */
+
+	/*
+	 * The following are probably not really needed on modern
+	 * terminals, but it's fashionable to do as much.
+	 *
+	 * BRKINT: break conditions trigger SIGINT.
+	 *
+	 * INPCK: parity checking, which might be useful over serial
+	 * terminals?
+	 *
+	 * ISTRIP strips the high bit.
+	 *
+	 * CS: set character size to 8-bit.
+	 * raw.c_iflag &= ~(BRKINT | INPCK | ISTRIP);
+	 *
+	 * NOTE(kyle): I had this set here, but then it turns out
+	 * that it fuckled my terminal.
+	 * raw.c_cflag |= CS8;
+	 */
+
+	/*
+	 * Switched over to cfmakeraw.
+	 */
+	cfmakeraw(&raw);
+
+	/*
+	 * Set timeout for read(2).
+	 *
+	 * VMIN: what is the minimum number of bytes required for read
+	 * to return?
+	 *
+	 * VTIME: max time before read(2) returns in hundreds of milli-
+	 * seconds.
+	 */
+	raw.c_cc[VMIN] = 0;
+	raw.c_cc[VTIME] = 1;
+
+	/*
+	 * Now write the terminal parameters to the current terminal,
+	 * after flushing any waiting input out.
+	 */
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) {
+		die("tcsetattr while enabling raw mode");
+	}
+}

@@ -1,5 +1,9 @@
 BIN :=		ke
-OBJS :=		main.o terminal.o util.o
+OBJS :=		main.o		\
+		display.o	\
+		keys.o		\
+		terminal.o	\
+		util.o
 
 LDFLAGS :=	-static
 CFLAGS :=	-pedantic -Wall -Werror -Wextra -O2 -std=c99

@@ -5,6 +5,9 @@
 #include "util.h"
 
 
+#define ESCSEQ		"\x1b["
+
+
 static struct termios	entry_term;
 
 
@@ -67,4 +70,12 @@ setup_terminal()
 	}
 	atexit(disable_termraw);
 	enable_termraw();
+}
+
+
+void
+display_clear()
+{
+	write(STDOUT_FILENO, ESCSEQ "2J", 4);
+	write(STDOUT_FILENO, ESCSEQ "H", 3);
 }
