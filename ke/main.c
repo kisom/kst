@@ -27,6 +27,9 @@ enum KeyPress {
 	ARROW_DOWN,
 	ARROW_LEFT,
 	ARROW_RIGHT,
+	DEL_KEY,
+	END_KEY,
+	HOME_KEY,
 	PG_UP,
 	PG_DN,
 };
@@ -125,6 +128,8 @@ is_arrow_key(int16_t c)
 	case CTRL_KEY('b'):
 	case PG_UP:
 	case PG_DN:
+	case HOME_KEY:
+	case END_KEY:
 		return 1;
 	};
 
@@ -152,8 +157,13 @@ get_keypress()
 					 return c;
 				if (seq[2] == '~') {
 					switch (seq[1]) {
+					case '1': return HOME_KEY;
+					case '2': return END_KEY;
+					case '3': return DEL_KEY;
 					case '5': return PG_UP;
 					case '6': return PG_DN;
+					case '7': return HOME_KEY;
+					case '8': return END_KEY;
 					}
 				}
 			} else {
@@ -162,10 +172,17 @@ get_keypress()
 				case 'B': return ARROW_DOWN;
 				case 'C': return ARROW_RIGHT;
 				case 'D': return ARROW_LEFT;
+				case 'F': return END_KEY;
+				case 'H': return HOME_KEY;
 
 				default:
 					/* nada */ ;
 				}
+			}
+		} else if (seq[0] == 'O') {
+			switch (seq[1]) {
+			case 'F': return END_KEY;
+			case 'H': return HOME_KEY;
 			}
 		}
 
@@ -239,6 +256,13 @@ move_cursor(int16_t c)
 			move_cursor(c == PG_UP ? ARROW_UP : ARROW_DOWN);
 		}				
 	}
+
+	case HOME_KEY:
+		editor.curx = 0;
+		break;
+	case END_KEY:
+		editor.curx = editor.cols - 1;
+		break;
 	default:
 		break;
 	}
