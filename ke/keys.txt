@@ -1,0 +1,37 @@
+An Exploration of the Keys
+==========================
+
+ESC: 1b
+
+Function keys: 1b followed by
+
+F1	F2	F3	F4	F5	F6	F7	F8
+4f O	4f O	4f O	4f O	5b	5b	5b	5b
+50 P	51 Q	52 R	54 S	31 1	31 1	31 1	31 1
+				35 5	37 7	38 8	39 9
+				7e ~	7e ~	7e ~	7e ~
+
+F9	F10	F11	F12
+5b [	5b [	5b [	5b [
+32 2	32 2	32 2	32 2
+30 0	31 1	33 3	34 4
+7e ~	7e ~	7e ~	7e ~
+
+DEL	7f	- but it should be a 4-byte escape sequence?
+BKSP	7f
+
+Arrow keys: 1b followed by
+UP	DN	LF	RT
+5b [	5b [	5b [	5b [
+41 A	42 B	44 D	43 C
+
+Other keys: 1b followed by
+
+HOME	END	PGUP	PGDN	INS
+5b [	5b [	5b [	5b [	5b [
+48 H	46 F	35 5	36 6	32 2
+		7e ~	7e ~	7e ~
+
+
+Notes: any time you see escape, you must process another key to figure
+out what to do.
