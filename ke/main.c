@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 
+#define	KE_VERSION	"0.0.1-pre"
 #define ESCSEQ		"\x1b["
 #define	CTRL_KEY(key)	((key)&0x1f)
 
@@ -18,11 +19,26 @@
  */
 #define	MODE_NORMAL	0
 #define	MODE_KCOMMAND	1
+#define	MODE_INSERT	2
 
+
+enum KeyPress {
+	ARROW_UP = 1000,
+	ARROW_DOWN,
+	ARROW_LEFT,
+	ARROW_RIGHT,
+	PG_UP,
+	PG_DN,
+};
+
+
+void	disable_termraw();
 
 struct {
 	struct termios	entry_term;
 	int		rows, cols;
+	int		curx, cury;
+	int		mode;
 } editor;
 
 
@@ -95,43 +111,181 @@ get_winsz(int *rows, int *cols)
 }
 
 
-static char
+uint16_t
+is_arrow_key(int16_t c)
+{
+	switch (c) {
+	case ARROW_UP:
+	case ARROW_DOWN:
+	case ARROW_LEFT:
+	case ARROW_RIGHT:
+	case CTRL_KEY('p'):
+	case CTRL_KEY('n'):
+	case CTRL_KEY('f'):
+	case CTRL_KEY('b'):
+	case PG_UP:
+	case PG_DN:
+		return 1;
+	};
+
+	return 0;
+}
+
+
+int16_t
 get_keypress()
 {
-	char	c = 0;
+	char	seq[3];
+	char	c = -1;
 
 	if (read(STDIN_FILENO, &c, 1) == -1) {
 		die("get_keypress:read");
+	}
+
+	if (c == 0x1b) {
+		if (read(STDIN_FILENO, &seq[0], 1) != 1) return c;
+		if (read(STDIN_FILENO, &seq[1], 1) != 1) return c;
+
+		if (seq[0] == '[') {
+			if (seq[1] < 'A') {
+				if (read(STDIN_FILENO, &seq[2], 1) != 1)
+					 return c;
+				if (seq[2] == '~') {
+					switch (seq[1]) {
+					case '5': return PG_UP;
+					case '6': return PG_DN;
+					}
+				}
+			} else {
+				switch (seq[1]) {
+				case 'A': return ARROW_UP;
+				case 'B': return ARROW_DOWN;
+				case 'C': return ARROW_RIGHT;
+				case 'D': return ARROW_LEFT;
+
+				default:
+					/* nada */ ;
+				}
+			}
+		}
+
+		return 0x1b;
 	}
 
 	return c;
 }
 
 
+static inline void
+ymov(int dy)
+{
+	editor.cury += dy;
+	if (editor.cury < 0) {
+		editor.cury = 0;
+	} else if (editor.cury > editor.rows) {
+		/* 
+		 * NOTE(kyle): this should be restrited to buffer lines,
+		 * but we don't have a buffer yet.
+		 */
+		editor.cury = editor.rows;
+	}
+}
+
+
+static inline void
+xmov(int dx)
+{
+	editor.curx += dx;
+	if (editor.curx < 0) {
+		editor.curx = 0;
+		ymov(-1);
+	} else if (editor.curx > editor.cols) {
+		if (editor.cury == editor.rows) {
+			editor.curx = editor.cols;
+		} else {
+			editor.curx = 0;
+		}
+		ymov(1);
+	}
+}
+
+
+void
+move_cursor(int16_t c)
+{
+	int	reps;
+
+	switch (c) {
+	case ARROW_UP:
+	case CTRL_KEY('p'):
+		ymov(-1);
+		break;
+	case ARROW_DOWN:
+	case CTRL_KEY('n'):
+		ymov(1);
+		break;
+	case ARROW_RIGHT:
+	case CTRL_KEY('f'):
+		xmov(1);
+		break;
+	case ARROW_LEFT:
+	case CTRL_KEY('b'):
+		xmov(-1);
+		break;
+	case PG_UP:
+	case PG_DN: {
+		reps = editor.rows;
+		while (--reps) {
+			move_cursor(c == PG_UP ? ARROW_UP : ARROW_DOWN);
+		}				
+	}
+	default:
+		break;
+	}
+}
+
+
+void
+process_kcommand(int16_t c)
+{
+	switch (c) {
+	case 'q':
+	case CTRL_KEY('q'):
+		exit(0);
+	case 'd':
+	case CTRL_KEY('\\'):
+		/* sometimes it's nice to dump core */
+		disable_termraw();
+		abort();
+	}
+
+	editor.mode = MODE_NORMAL;
+	return;
+}
+
+
 void
 process_keypress()
 {
-	static int	m = MODE_NORMAL;
-	char		c = get_keypress();
+	int16_t	c = get_keypress();
 
-	if (c == 0x0) {
+	/* we didn't actually read a key */
+	if (c <= 0) {
 		return;
 	}
 
-	switch (m) {
+	switch (editor.mode) {
 	case MODE_KCOMMAND:
-		switch (c) {
-		case 'q':
-		case CTRL_KEY('q'):
-			exit(0);
+		process_kcommand(c);
+		break;
+	case MODE_NORMAL:
+		if (is_arrow_key(c)) {
+			move_cursor(c);
 		}
-
-		m = MODE_NORMAL;
-		return;
 	}
 
 	if (c == CTRL_KEY('k')) {
-		m = MODE_KCOMMAND;
+		editor.mode = MODE_KCOMMAND;
 		return;
 	}
 }
@@ -179,7 +333,20 @@ enable_termraw()
 }
 
 
-static void
+void
+display_clear(struct abuf *ab)
+{
+	if (ab == NULL) {
+		write(STDOUT_FILENO, ESCSEQ "2J", 4);
+		write(STDOUT_FILENO, ESCSEQ "H", 3);
+	} else {
+		ab_append(ab, ESCSEQ "2J", 4);
+		ab_append(ab, ESCSEQ "H", 3);
+	}
+}
+
+
+void
 disable_termraw()
 {
 	display_clear(NULL);
@@ -202,38 +369,36 @@ setup_terminal()
 
 
 void
-display_clear(struct abuf *ab)
-{
-	if (ab == NULL) {
-		write(STDOUT_FILENO, ESCSEQ "2J", 4);
-		write(STDOUT_FILENO, ESCSEQ "H", 3);
-	} else {
-		ab_append(ab, ESCSEQ "2J", 4);
-		ab_append(ab, ESCSEQ "H", 3);
-	}
-}
-
-
-void
 draw_rows(struct abuf *ab)
 {
+	char	buf[editor.cols];
 	int	y;
 
 	for (y = 0; y < editor.rows-1; y++) {
-		ab_append(ab, "|\r\n", 3);
+		ab_append(ab, ESCSEQ "K|\r\n", 6);
 	}
-	ab_append(ab, "|", 1);
+
+	snprintf(buf, sizeof(buf), ESCSEQ "K+ [%d,%d] ke v" KE_VERSION,
+		 editor.cury, editor.curx);
+	ab_append(ab, buf, strlen(buf));
 }
 
 
 void
 display_refresh()
 {
+	char		buf[32];
 	struct abuf	ab = ABUF_INIT;
 
 	ab_append(&ab, ESCSEQ "?25l", 6);
 	display_clear(&ab);
+
 	draw_rows(&ab);
+	
+	snprintf(buf, sizeof(buf), ESCSEQ "%d;%dH", editor.cury+1,
+		 editor.curx+1);
+	ab_append(&ab, buf, strnlen(buf, 32));
+
 	ab_append(&ab, ESCSEQ "1;2H", 7);
 	ab_append(&ab, ESCSEQ "?25h", 6);
 
@@ -261,6 +426,9 @@ init_editor()
 	if (get_winsz(&editor.rows, &editor.cols) == -1) {
 		die("can't get window size");
 	}
+
+	editor.curx = 0;
+	editor.cury = 0;
 }
 
 

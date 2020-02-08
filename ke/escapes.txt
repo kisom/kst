@@ -7,7 +7,17 @@ https://vt100.net/docs/vt100-ug/chapter3.html
 H		reposition cursor @ 1,1
 ${row};${col}H	reposition cursor @ ${row},${col}
 J		erase-in-display
+	0: cursor to end of screen
+	1: up to cursor
+	2: whole screen
+K		erase-in-line
+	0: (default) to the right of the cursor
+	1: to the left of the cursor
+	2: whole line
 h		set mode
 l		reset mode
 	modes:
 		?25	hide cursor feature
+~		special keys?
+	5: pgup
+	6: pgdn

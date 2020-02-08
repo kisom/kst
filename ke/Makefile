@@ -1,18 +1,21 @@
 BIN :=		ke
 OBJS :=		main.o
 
-LDFLAGS :=	-static
-CFLAGS :=	-pedantic -Wall -Werror -Wextra -O2 -std=c99
+LDFLAGS :=	
+CFLAGS :=	-pedantic -Wall -Werror -Wextra -O2 -std=c99 -g 
 
 .PHONY: all
-all: $(BIN) run
+all: build run
 
-$(BIN): $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $(OBJS)
+.PHONY: build
+build: $(BIN)
+
+$(BIN): main.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ main.c
 
 .PHONY: clean
 clean:
-	rm -f $(BIN) $(OBJS)
+	rm -f $(BIN) $(OBJS) *.core
 
 .PHONY: run
 run: $(BIN)
