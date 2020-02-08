@@ -1,0 +1,13 @@
+ESCAPE CODES
+============
+
+note: these will all omit the leading ESC[
+https://vt100.net/docs/vt100-ug/chapter3.html
+
+H		reposition cursor @ 1,1
+${row};${col}H	reposition cursor @ ${row},${col}
+J		erase-in-display
+h		set mode
+l		reset mode
+	modes:
+		?25	hide cursor feature
