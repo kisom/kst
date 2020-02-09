@@ -37,11 +37,18 @@ enum KeyPress {
 
 void	disable_termraw();
 
+typedef struct erow {
+	char	*line;
+	int	 size;
+} erow;
+
 struct {
-	struct termios	entry_term;
-	int		rows, cols;
-	int		curx, cury;
-	int		mode;
+	struct termios	 entry_term;
+	int		 rows, cols;
+	int		 curx, cury;
+	int		 mode;
+	int		 nrows;
+	erow		*row;
 } editor;
 
 
@@ -111,6 +118,47 @@ get_winsz(int *rows, int *cols)
 	*cols = ws.ws_col;
 	*rows = ws.ws_row;
 	return 0;
+}
+
+
+void
+append_row(char *s, size_t len)
+{
+	int	at = editor.nrows;
+
+	editor.row = realloc(editor.row, sizeof(erow) * (editor.nrows + 1));
+	editor.row[at].size = len;
+	editor.row[at].line = malloc(len+1);
+	memcpy(editor.row[at].line, s, len);
+	editor.row[at].line[len] = '\0';
+	editor.nrows++;
+}
+
+
+void
+open_file(const char *filename)
+{
+	char	*line = NULL;
+	size_t	 linecap = 0;
+	ssize_t	 linelen;
+	FILE	*fp = fopen(filename, "r");
+	if (!fp) {
+		die("fopen");
+	}
+
+	while ((linelen = getline(&line, &linecap, fp)) != -1) {
+		if (linelen != -1) {
+			while ((linelen > 0) && ((line[linelen-1] == '\r') ||
+						 (line[linelen-1] == '\n'))) {
+				linelen--;
+			}
+
+			append_row(line, linelen);
+		}
+	}
+
+	free(line);
+	fclose(fp);
 }
 
 
@@ -396,15 +444,38 @@ void
 draw_rows(struct abuf *ab)
 {
 	char	buf[editor.cols];
+	int	buflen, padding;
 	int	y;
 
-	for (y = 0; y < editor.rows-1; y++) {
-		ab_append(ab, ESCSEQ "K|\r\n", 6);
-	}
+	for (y = 0; y < editor.rows; y++) {
+		if (y >= editor.nrows) {
+			if ((editor.nrows == 0) && (y == editor.rows / 3)) {
+				buflen = snprintf(buf, sizeof(buf),
+					"ke k%s", KE_VERSION);
+				padding = (editor.rows - buflen) / 2;
 
-	snprintf(buf, sizeof(buf), ESCSEQ "K+ [%d,%d] ke v" KE_VERSION,
-		 editor.cury, editor.curx);
-	ab_append(ab, buf, strlen(buf));
+				if (padding) {
+					ab_append(ab, "|", 1);
+					padding--;
+				}
+
+				while (padding--) ab_append(ab, " ", 1);
+				ab_append(ab, buf, buflen);
+			} else {
+				ab_append(ab, "|", 1);
+			}
+		} else {
+			buflen = editor.row[y].size;
+			if (buflen > editor.rows) {
+				buflen = editor.rows;
+			}
+			ab_append(ab, editor.row[y].line, buflen);
+		}
+		ab_append(ab, ESCSEQ "K", 3);
+		if (y < (editor.rows - 1)) {
+			ab_append(ab, "\r\n", 2);
+		}
+	}
 }
 
 
@@ -422,8 +493,7 @@ display_refresh()
 	snprintf(buf, sizeof(buf), ESCSEQ "%d;%dH", editor.cury+1,
 		 editor.curx+1);
 	ab_append(&ab, buf, strnlen(buf, 32));
-
-	ab_append(&ab, ESCSEQ "1;2H", 7);
+	/* ab_append(&ab, ESCSEQ "1;2H", 7); */
 	ab_append(&ab, ESCSEQ "?25h", 6);
 
 	write(STDOUT_FILENO, ab.b, ab.len);
@@ -453,14 +523,21 @@ init_editor()
 
 	editor.curx = 0;
 	editor.cury = 0;
+
+	editor.nrows = 0;
+	editor.row = NULL;
 }
 
 
 int
-main()
+main(int argc, char *argv[])
 {
 	setup_terminal();
 	init_editor();
+
+	if (argc > 1) {
+		open_file(argv[1]);
+	}
 
 	display_clear(NULL);
 	loop();
