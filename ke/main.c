@@ -17,6 +17,7 @@
 #define	KE_VERSION	"0.0.1-pre"
 #define ESCSEQ		"\x1b["
 #define	CTRL_KEY(key)	((key)&0x1f)
+#define TAB_STOP	8
 
 /*
  * define the keyboard input modes
@@ -55,6 +56,7 @@ struct {
 	struct termios	 entry_term;
 	int		 rows, cols;
 	int		 curx, cury;
+	int		 rx;
 	int		 mode;
 	int		 nrows;
 	int		 rowoffs, coloffs;
@@ -132,6 +134,39 @@ get_winsz(int *rows, int *cols)
 
 
 void
+update_row(erow *row)
+{
+	int	i = 0, j;
+	int	tabs = 0;
+
+	/*
+	 * TODO(kyle): I'm not thrilled with this double-render.
+	 */
+	for (j = 0; j < row->size; j++) {
+		if (row->line[j] == '\t') {
+			tabs++;
+		}
+	}
+
+	free(row->render);
+	row->render = malloc(row->size + (tabs * (TAB_STOP-1)) + 1);
+
+	for (j = 0; j < row->size; j++) {
+		if (row->line[j] == '\t') {
+			do {
+				row->render[i++] = ' ';
+			} while ((i % TAB_STOP) != 0);
+		} else {
+			row->render[i++] = row->line[j];
+		}
+	}
+
+	row->render[i] = '\0';
+	row->rsize = i;
+}
+
+
+void
 append_row(char *s, size_t len)
 {
 	int	at = editor.nrows;
@@ -145,6 +180,7 @@ append_row(char *s, size_t len)
 	editor.row[at].rsize = 0;
 	editor.row[at].render = NULL;
 
+	update_row(&editor.row[at]);
 	editor.nrows++;
 }
 
@@ -295,7 +331,16 @@ move_cursor(int16_t c)
 		break;
 	case PG_UP:
 	case PG_DN: {
-		reps = editor.rows+1;
+		if (c == PG_UP) {
+			editor.cury = editor.rowoffs;
+		} else if (c == PG_DN) {
+			editor.cury = editor.rowoffs + editor.rows-1;
+			if (editor.cury > editor.nrows) {
+				editor.cury = editor.nrows;
+			}
+		}
+
+		reps = editor.rows;
 		while (--reps) {
 			move_cursor(c == PG_UP ? ARROW_UP : ARROW_DOWN);
 		}
@@ -470,7 +515,7 @@ draw_rows(struct abuf *ab)
 				ab_append(ab, "|", 1);
 			}
 		} else {
-			buflen = editor.row[filerow].size - editor.coloffs;
+			buflen = editor.row[filerow].rsize - editor.coloffs;
 			if (buflen < 0) {
 				buflen = 0;
 			}
@@ -478,7 +523,7 @@ draw_rows(struct abuf *ab)
 			if (buflen > editor.cols) {
 				buflen = editor.cols;
 			}
-			ab_append(ab, editor.row[filerow].line+editor.coloffs,
+			ab_append(ab, editor.row[filerow].render+editor.coloffs,
 				  buflen);
 		}
 		ab_append(ab, ESCSEQ "K", 3);
@@ -489,9 +534,33 @@ draw_rows(struct abuf *ab)
 }
 
 
+
+int
+row_render_to_cursor(erow *row, int cx)
+{
+	int	rx = 0;
+	int	j;
+
+	for (j = 0; j < cx; j++) {
+		if (row->line[j] == '\t') {
+			rx += (TAB_STOP-1) - (rx%TAB_STOP);
+		}
+		rx++;
+	}
+
+	return rx;
+}
+
 void
 scroll()
 {
+	editor.rx = 0;
+	if (editor.cury < editor.nrows) {
+		editor.rx = row_render_to_cursor(
+				&editor.row[editor.cury],
+				editor.curx);
+	}
+
 	if (editor.cury < editor.rowoffs) {
 		editor.rowoffs = editor.cury;
 	}
@@ -500,12 +569,12 @@ scroll()
 		editor.rowoffs = editor.cury - editor.rows + 1;
 	}
 
-	if (editor.curx < editor.coloffs) {
-		editor.coloffs = editor.curx;
+	if (editor.rx < editor.coloffs) {
+		editor.coloffs = editor.rx;
 	}
 
-	if (editor.curx >= editor.coloffs + editor.cols) {
-		editor.coloffs = editor.curx - editor.cols + 1;
+	if (editor.rx >= editor.coloffs + editor.cols) {
+		editor.coloffs = editor.rx - editor.cols + 1;
 	}
 }
 
@@ -525,7 +594,7 @@ display_refresh()
 	
 	snprintf(buf, sizeof(buf), ESCSEQ "%d;%dH",
 		 (editor.cury-editor.rowoffs)+1,
-		 (editor.curx-editor.coloffs)+1);
+		 (editor.rx-editor.coloffs)+1);
 	ab_append(&ab, buf, strnlen(buf, 32));
 	/* ab_append(&ab, ESCSEQ "1;2H", 7); */
 	ab_append(&ab, ESCSEQ "?25h", 6);
@@ -556,6 +625,7 @@ init_editor()
 	}
 
 	editor.curx = editor.cury = 0;
+	editor.rx = 0;
 
 	editor.nrows = 0;
 	editor.rowoffs = editor.coloffs = 0;
