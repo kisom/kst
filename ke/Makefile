@@ -20,7 +20,7 @@ clean:
 .PHONY: run
 run: $(BIN)
 	reset
-	./$(BIN) escapes.txt
+	./$(BIN) notes.txt
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $@ $<

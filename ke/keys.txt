@@ -6,19 +6,19 @@ ESC: 1b
 Function keys: 1b followed by
 
 F1	F2	F3	F4	F5	F6	F7	F8
-4f O	4f O	4f O	4f O	5b	5b	5b	5b
+4f O	4F O	4F O	4F O	5B	5B	5B	5B
 50 P	51 Q	52 R	54 S	31 1	31 1	31 1	31 1
 				35 5	37 7	38 8	39 9
-				7e ~	7e ~	7e ~	7e ~
+				7E ~	7E ~	7E ~	7E ~
 
 F9	F10	F11	F12
-5b [	5b [	5b [	5b [
+5B [	5B [	5B [	5B [
 32 2	32 2	32 2	32 2
 30 0	31 1	33 3	34 4
-7e ~	7e ~	7e ~	7e ~
+7E ~	7E ~	7E ~	7E ~
 
-DEL	7f	- but it should be a 4-byte escape sequence?
-BKSP	7f
+DEL	7F	- BUT IT SHOULD BE A 4-BYTE ESCAPE SEQUENCE?
+BKSP	7F
 
 Arrow keys: 1b followed by
 UP	DN	LF	RT

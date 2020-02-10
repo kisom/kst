@@ -1,3 +1,9 @@
+/*
+ * kyle's editor
+ *
+ * first version is a run-through of the kilo editor walkthrough.
+ * https://viewsourcecode.org/snaptoken/kilo/
+ */
 #include <sys/ioctl.h>
 #include <ctype.h>
 #include <errno.h>
@@ -39,7 +45,10 @@ void	disable_termraw();
 
 typedef struct erow {
 	char	*line;
+	char	*render;
+
 	int	 size;
+	int	 rsize;
 } erow;
 
 struct {
@@ -48,6 +57,7 @@ struct {
 	int		 curx, cury;
 	int		 mode;
 	int		 nrows;
+	int		 rowoffs, coloffs;
 	erow		*row;
 } editor;
 
@@ -131,6 +141,10 @@ append_row(char *s, size_t len)
 	editor.row[at].line = malloc(len+1);
 	memcpy(editor.row[at].line, s, len);
 	editor.row[at].line[len] = '\0';
+
+	editor.row[at].rsize = 0;
+	editor.row[at].render = NULL;
+
 	editor.nrows++;
 }
 
@@ -241,68 +255,50 @@ get_keypress()
 }
 
 
-static inline void
-ymov(int dy)
-{
-	editor.cury += dy;
-	if (editor.cury < 0) {
-		editor.cury = 0;
-	} else if (editor.cury > editor.rows) {
-		/* 
-		 * NOTE(kyle): this should be restrited to buffer lines,
-		 * but we don't have a buffer yet.
-		 */
-		editor.cury = editor.rows;
-	}
-}
-
-
-static inline void
-xmov(int dx)
-{
-	editor.curx += dx;
-	if (editor.curx < 0) {
-		editor.curx = 0;
-		ymov(-1);
-	} else if (editor.curx > editor.cols) {
-		if (editor.cury == editor.rows) {
-			editor.curx = editor.cols;
-		} else {
-			editor.curx = 0;
-		}
-		ymov(1);
-	}
-}
-
-
 void
 move_cursor(int16_t c)
 {
-	int	reps;
+	erow	*row = (editor.cury >= editor.nrows) ?
+		       NULL : &editor.row[editor.cury];
+	int	 reps;
 
 	switch (c) {
 	case ARROW_UP:
 	case CTRL_KEY('p'):
-		ymov(-1);
+		if (editor.cury > 0) {
+			editor.cury--;
+		}
 		break;
 	case ARROW_DOWN:
 	case CTRL_KEY('n'):
-		ymov(1);
+		if (editor.cury < editor.nrows) {
+			editor.cury++;
+		}
 		break;
 	case ARROW_RIGHT:
 	case CTRL_KEY('f'):
-		xmov(1);
+		if (row && editor.curx < row->size) {
+			editor.curx++;
+		} else if (row && editor.curx == row->size) {
+			editor.cury++;
+			editor.curx = 0;
+		}
 		break;
 	case ARROW_LEFT:
 	case CTRL_KEY('b'):
-		xmov(-1);
+		if (editor.curx > 0) {
+			editor.curx--;
+		} else if (editor.cury > 0) {
+			editor.cury--;
+			editor.curx = editor.row[editor.cury].size;
+		}
 		break;
 	case PG_UP:
 	case PG_DN: {
-		reps = editor.rows;
+		reps = editor.rows+1;
 		while (--reps) {
 			move_cursor(c == PG_UP ? ARROW_UP : ARROW_DOWN);
-		}				
+		}
 	}
 
 	case HOME_KEY:
@@ -313,6 +309,14 @@ move_cursor(int16_t c)
 		break;
 	default:
 		break;
+	}
+
+
+	row = (editor.cury >= editor.nrows) ?
+	      NULL : &editor.row[editor.cury];
+	reps = row ? row->size : 0;
+	if (editor.curx > reps) {
+		editor.curx = reps;
 	}
 }
 
@@ -444,11 +448,12 @@ void
 draw_rows(struct abuf *ab)
 {
 	char	buf[editor.cols];
-	int	buflen, padding;
+	int	buflen, filerow, padding;
 	int	y;
 
 	for (y = 0; y < editor.rows; y++) {
-		if (y >= editor.nrows) {
+		filerow = y + editor.rowoffs;
+		if (filerow >= editor.nrows) {
 			if ((editor.nrows == 0) && (y == editor.rows / 3)) {
 				buflen = snprintf(buf, sizeof(buf),
 					"ke k%s", KE_VERSION);
@@ -465,11 +470,16 @@ draw_rows(struct abuf *ab)
 				ab_append(ab, "|", 1);
 			}
 		} else {
-			buflen = editor.row[y].size;
-			if (buflen > editor.rows) {
-				buflen = editor.rows;
+			buflen = editor.row[filerow].size - editor.coloffs;
+			if (buflen < 0) {
+				buflen = 0;
 			}
-			ab_append(ab, editor.row[y].line, buflen);
+
+			if (buflen > editor.cols) {
+				buflen = editor.cols;
+			}
+			ab_append(ab, editor.row[filerow].line+editor.coloffs,
+				  buflen);
 		}
 		ab_append(ab, ESCSEQ "K", 3);
 		if (y < (editor.rows - 1)) {
@@ -480,18 +490,42 @@ draw_rows(struct abuf *ab)
 
 
 void
+scroll()
+{
+	if (editor.cury < editor.rowoffs) {
+		editor.rowoffs = editor.cury;
+	}
+
+	if (editor.cury >= editor.rowoffs + editor.rows) {
+		editor.rowoffs = editor.cury - editor.rows + 1;
+	}
+
+	if (editor.curx < editor.coloffs) {
+		editor.coloffs = editor.curx;
+	}
+
+	if (editor.curx >= editor.coloffs + editor.cols) {
+		editor.coloffs = editor.curx - editor.cols + 1;
+	}
+}
+
+
+void
 display_refresh()
 {
 	char		buf[32];
 	struct abuf	ab = ABUF_INIT;
+
+	scroll();
 
 	ab_append(&ab, ESCSEQ "?25l", 6);
 	display_clear(&ab);
 
 	draw_rows(&ab);
 	
-	snprintf(buf, sizeof(buf), ESCSEQ "%d;%dH", editor.cury+1,
-		 editor.curx+1);
+	snprintf(buf, sizeof(buf), ESCSEQ "%d;%dH",
+		 (editor.cury-editor.rowoffs)+1,
+		 (editor.curx-editor.coloffs)+1);
 	ab_append(&ab, buf, strnlen(buf, 32));
 	/* ab_append(&ab, ESCSEQ "1;2H", 7); */
 	ab_append(&ab, ESCSEQ "?25h", 6);
@@ -521,10 +555,10 @@ init_editor()
 		die("can't get window size");
 	}
 
-	editor.curx = 0;
-	editor.cury = 0;
+	editor.curx = editor.cury = 0;
 
 	editor.nrows = 0;
+	editor.rowoffs = editor.coloffs = 0;
 	editor.row = NULL;
 }
 

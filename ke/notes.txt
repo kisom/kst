@@ -85,3 +85,7 @@ enable_termraw()
 		die("tcsetattr while enabling raw mode");
 	}
 }
+
+So this is a really long line; it should overflow the buffer and it's helpful for doing things like testing horizontal scrolling. Furthermore, it's at least twice as long as the line is likely to be, so there's more opportunity to test whether scrolling works correctly.
+
+But this line is nominal.
