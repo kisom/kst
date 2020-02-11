@@ -1,17 +1,17 @@
 BIN :=		ke
-OBJS :=		main.o
+OBJS :=		main.o abuf.o
 
 LDFLAGS :=
-CFLAGS :=	-pedantic -Wall -Werror -Wextra -O0 -std=c99 -g 
+CFLAGS :=	-pedantic -Wall -Werror -Wextra -O0 -std=c99 -g
 
 .PHONY: all
-all: build 
+all: build
 
 .PHONY: build
 build: $(BIN)
 
-$(BIN): main.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ main.c
+$(BIN): $(OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
 
 .PHONY: clean
 clean:
@@ -30,4 +30,3 @@ install: $(BIN)
 	cp $(BIN) $(HOME)/bin/
 
 %.o: %.c
-

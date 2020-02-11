@@ -5,6 +5,7 @@
  * https://viewsourcecode.org/snaptoken/kilo/
  */
 #include <sys/ioctl.h>
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -16,6 +17,8 @@
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
+
+#include "abuf.h"
 
 
 #define	KE_VERSION	"0.0.1-pre"
@@ -82,36 +85,6 @@ struct {
 } editor;
 
 
-/* append buffer */
-struct abuf {
-	char	*b;
-	int	 len;
-};
-#define ABUF_INIT	{NULL, 0}
-
-
-void
-ab_append(struct abuf *buf, const char *s, int len)
-{
-	char	*nc = realloc(buf->b, buf->len + len);
-
-	if (nc == NULL) {
-		abort();
-	}
-
-	memcpy(&nc[buf->len], s, len);
-	buf->b = nc;
-	buf->len += len; /* DANGER: overflow */
-}
-
-
-void
-ab_free(struct abuf *buf)
-{
-	free(buf->b);
-	buf->b = NULL;
-}
-
 
 void
 die(const char *s)
@@ -122,7 +95,7 @@ die(const char *s)
 	 */
 	write(STDOUT_FILENO, "\x1b[2J", 4);
 	write(STDOUT_FILENO, "\x1b[H", 3);
-	
+
 	perror(s);
 	exit(1);
 }
@@ -174,18 +147,18 @@ row_cursor_to_render(erow *row, int rx)
 {
 	int	cur_rx = 0;
 	int	curx = 0;
-	
+
 	for (curx = 0; curx < row->size; curx++) {
 		if (row->line[curx] == '\t') {
-			cur_rx += (TAB_STOP - 1) - (cur_rx % TAB_STOP);	
+			cur_rx += (TAB_STOP - 1) - (cur_rx % TAB_STOP);
 		}
 		cur_rx++;
-		
+
 		if (cur_rx > rx) {
 			break;
 		}
 	}
-	
+
 	return curx;
 }
 
@@ -234,12 +207,12 @@ insert_row(int at, char *s, size_t len)
 
 	editor.row = realloc(editor.row, sizeof(erow) * (editor.nrows + 1));
 	assert(editor.row != NULL);
-	
+
 	if (at < editor.nrows) {
 		memmove(&editor.row[at+1], &editor.row[at],
 		    sizeof(erow) * (editor.nrows - at + 1));
 	}
-	
+
 	editor.row[at].size = len;
 	editor.row[at].line = malloc(len+1);
 	memcpy(editor.row[at].line, s, len);
@@ -267,9 +240,9 @@ void
 delete_row(int at)
 {
 	if (at < 0 || at >= editor.nrows) {
-		return;	
+		return;
 	}
-	
+
 	free_row(&editor.row[at]);
 	memmove(&editor.row[at], &editor.row[at+1],
 	    sizeof(erow) * (editor.nrows - at - 1));
@@ -350,13 +323,13 @@ deletech()
 	if (editor.cury == editor.nrows) {
 		return;
 	}
-	
+
 	if (editor.cury == 0 && editor.curx == 0) {
 		return;
 	}
 
 	row = &editor.row[editor.cury];
-	
+
 	if (editor.curx > 0) {
 		row_delete_ch(row, editor.curx - 1);
 		editor.curx--;
@@ -381,7 +354,7 @@ open_file(const char *filename)
 	free(editor.filename);
 	editor.filename = strdup(filename);
 	assert(editor.filename != NULL);
-	
+
 	editor.dirty = 0;
 	if ((fp = fopen(filename, "r")) == NULL) {
 		if (errno == ENOENT) {
@@ -422,7 +395,7 @@ rows_to_buffer(int *buflen)
 		/* extra byte for newline */
 		len += editor.row[j].size+1;
 	}
-	
+
 	if (len == 0) {
 		return NULL;
 	}
@@ -466,7 +439,7 @@ save_file()
 	if (-1 == ftruncate(fd, len)) {
 		goto save_exit;
 	}
-	
+
 	if (len == 0) {
 		status = 0;
 		goto save_exit;
@@ -488,10 +461,10 @@ save_exit:
 		    buf);
 	} else {
 		editor_set_status("Wrote %d bytes to %s.", len,
-		    editor.filename); 
+		    editor.filename);
 		editor.dirty = 0;
 	}
-	
+
 	return status;
 }
 
@@ -585,21 +558,21 @@ editor_prompt(char *prompt, void (*cb)(char *, int16_t))
 	char	*buf = malloc(bufsz);
 	size_t	 buflen = 0;
 	int16_t	 c;
-	
+
 	buf[0] = '\0';
-	
+
 	while (1) {
 		editor_set_status(prompt, buf);
 		display_refresh();
 		while ((c = get_keypress()) <= 0) ;
 		if (c == DEL_KEY || c == CTRL_KEY('h') || c == BACKSPACE) {
 			if (buflen != 0) {
-				buf[--buflen] = '\0';	
+				buf[--buflen] = '\0';
 			}
 		} else if (c == ESC_KEY) {
 			editor_set_status("");
 			if (cb) {
-				cb(buf, c);	
+				cb(buf, c);
 			}
 			free(buf);
 			return NULL;
@@ -617,11 +590,11 @@ editor_prompt(char *prompt, void (*cb)(char *, int16_t))
 				buf = realloc(buf, bufsz);
 				assert(buf != NULL);
 			}
-			
+
 			buf[buflen++] = c;
 			buf[buflen] = '\0';
 		}
-		
+
 		if (cb) {
 			cb(buf, c);
 		}
@@ -644,27 +617,27 @@ editor_find_callback(char *query, int16_t c)
 		dir = 1;
 		return;
 	} else if (c == ARROW_RIGHT || c == ARROW_DOWN) {
-		dir = 1;	
+		dir = 1;
 	} else if (c == ARROW_LEFT || c == ARROW_UP) {
 		dir = -1;
 	} else {
 		lmatch = -1;
 		dir = 1;
 	}
-	
+
 	if (lmatch == -1) {
 		dir = 1;
 	}
 	current = lmatch;
-	
+
 	for (i = 0; i < editor.nrows; i++) {
 		current += dir;
 		if (current == -1) {
-			current = editor.nrows - 1;	
+			current = editor.nrows - 1;
 		} else if (current == editor.nrows) {
-			current = 0;	
+			current = 0;
 		}
-		
+
 		row = &editor.row[current];
 		match = strstr(row->render, query);
 		if (match) {
@@ -672,7 +645,7 @@ editor_find_callback(char *query, int16_t c)
 			editor.cury = current;
 			editor.curx = row_render_to_cursor(row,
 			    match - row->render);
-			/* 
+			/*
 			 * after this, scroll will put the match line at
 			 * the top of the screen.
 			 */
@@ -680,8 +653,8 @@ editor_find_callback(char *query, int16_t c)
 			break;
 		}
 	}
-	
-	display_refresh();	
+
+	display_refresh();
 }
 
 
@@ -693,7 +666,7 @@ editor_find()
 	int	 scy = editor.cury;
 	int	 sco = editor.coloffs;
 	int	 sro = editor.rowoffs;
-	
+
 	query = editor_prompt("Search (ESC to cancel): %s",
 	    editor_find_callback);
 	if (query) {
@@ -704,7 +677,7 @@ editor_find()
 		editor.coloffs = sco;
 		editor.rowoffs = sro;
 	}
-	
+
 	display_refresh();
 }
 
@@ -792,7 +765,7 @@ newline()
 	erow	*row = NULL;
 
 	if (editor.curx == 0) {
-		insert_row(editor.cury, "", 0);	
+		insert_row(editor.cury, "", 0);
 	} else {
 		row = &editor.row[editor.cury];
 		insert_row(editor.cury + 1, &row->line[editor.curx],
@@ -802,7 +775,7 @@ newline()
 		row->line[row->size] = '\0';
 		update_row(row);
 	}
-	
+
 	editor.cury++;
 	editor.curx = 0;
 }
@@ -844,7 +817,7 @@ process_kcommand(int16_t c)
 		break;
 	}
 
-	editor.dirtyex = 1;	
+	editor.dirtyex = 1;
 	return;
 }
 
@@ -869,7 +842,7 @@ process_normal(int16_t c)
 		if (c == DEL_KEY) {
 			move_cursor(ARROW_RIGHT);
 		}
-		
+
 		deletech();
 		break;
 	case CTRL_KEY('l'):
@@ -884,7 +857,7 @@ process_normal(int16_t c)
 		}
 		break;
 	}
-	
+
 	editor.dirtyex = 1;
 }
 
@@ -995,7 +968,7 @@ void
 draw_rows(struct abuf *ab)
 {
 	assert(editor.cols >= 0);
-	
+
 	char	buf[editor.cols];
 	int	buflen, filerow, padding;
 	int	y;
@@ -1123,7 +1096,7 @@ display_refresh()
 	draw_rows(&ab);
 	draw_status_bar(&ab);
 	draw_message_line(&ab);
-	
+
 	snprintf(buf, sizeof(buf), ESCSEQ "%d;%dH",
 		 (editor.cury-editor.rowoffs)+1,
 		 (editor.rx-editor.coloffs)+1);
@@ -1169,7 +1142,7 @@ init_editor()
 {
 	editor.cols = 0;
 	editor.rows = 0;
-	
+
 	if (get_winsz(&editor.rows, &editor.cols) == -1) {
 		die("can't get window size");
 	}
@@ -1185,7 +1158,7 @@ init_editor()
 
 	editor.msg[0] = '\0';
 	editor.msgtm = 0;
-	
+
 	editor.dirty = 0;
 }
 
