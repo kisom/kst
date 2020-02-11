@@ -1,11 +1,11 @@
 BIN :=		ke
 OBJS :=		main.o
 
-LDFLAGS :=	
+LDFLAGS :=
 CFLAGS :=	-pedantic -Wall -Werror -Wextra -O2 -std=c99 -g 
 
 .PHONY: all
-all: build run
+all: build 
 
 .PHONY: build
 build: $(BIN)
@@ -15,12 +15,12 @@ $(BIN): main.c
 
 .PHONY: clean
 clean:
-	rm -f $(BIN) $(OBJS) *.core
+	rm -f $(BIN) $(OBJS) *.core keypress
 
 .PHONY: run
 run: $(BIN)
 	reset
-	./$(BIN) notes.txt
+	./$(BIN) hello.txt
 
 keypress: keypress.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ keypress.c

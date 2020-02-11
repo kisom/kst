@@ -7,6 +7,7 @@
 #include <sys/ioctl.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +21,7 @@
 #define ESCSEQ		"\x1b["
 #define	CTRL_KEY(key)	((key)&0x1f)
 #define TAB_STOP	8
-#define MSG_TIMEO	5
+#define MSG_TIMEO	3
 
 /*
  * define the keyboard input modes
@@ -32,14 +33,22 @@
 #define	MODE_INSERT	2
 
 
+void	 editor_set_status(const char *fmt, ...);
+void	 display_refresh();
+char	*editor_prompt(char *);
+
+
 enum KeyPress {
-	ARROW_UP = 1000,
-	ARROW_DOWN,
-	ARROW_LEFT,
+	TAB_KEY = 9,
+	ESC_KEY = 27,
+	BACKSPACE = 127,
+	ARROW_LEFT = 1000,
 	ARROW_RIGHT,
+	ARROW_UP,
+	ARROW_DOWN,
 	DEL_KEY,
-	END_KEY,
 	HOME_KEY,
+	END_KEY,
 	PG_UP,
 	PG_DN,
 };
@@ -65,6 +74,8 @@ struct {
 	int		 rowoffs, coloffs;
 	erow		*row;
 	char		*filename;
+	int		 dirty;
+	int		 dirtyex;
 	char		 msg[80];
 	time_t		 msgtm;
 } editor;
@@ -173,11 +184,19 @@ update_row(erow *row)
 
 
 void
-append_row(char *s, size_t len)
+insert_row(int at, char *s, size_t len)
 {
-	int	at = editor.nrows;
+	if (at < 0 || at > editor.nrows) {
+		return;
+	}
 
 	editor.row = realloc(editor.row, sizeof(erow) * (editor.nrows + 1));
+	
+	if (at < editor.nrows) {
+		memmove(&editor.row[at+1], &editor.row[at],
+		    sizeof(erow) * (editor.rows - at));
+	}
+	
 	editor.row[at].size = len;
 	editor.row[at].line = malloc(len+1);
 	memcpy(editor.row[at].line, s, len);
@@ -192,13 +211,136 @@ append_row(char *s, size_t len)
 
 
 void
+free_row(erow *row)
+{
+	free(row->render);
+	free(row->line);
+	row->render = NULL;
+	row->line  = NULL;
+}
+
+
+void
+delete_row(int at)
+{
+	if (at < 0 || at >= editor.nrows) {
+		return;	
+	}
+	
+	free_row(&editor.row[at]);
+	memmove(&editor.row[at], &editor.row[at+1],
+	    sizeof(erow) * (editor.nrows - at - 1));
+	editor.nrows--;
+	editor.dirty++;
+}
+
+
+void
+row_append_row(erow *row, char *s, int len)
+{
+	row->line = realloc(row->line, row->size + len + 1);
+	memcpy(&row->line[row->size], s, len);
+	row->size += len;
+	row->line[row->size] = '\0';
+	update_row(row);
+	editor.dirty++;
+}
+
+
+void
+row_insert_ch(erow *row, int at, int16_t c)
+{
+	/*
+	 * row_insert_ch just concerns itself with how to update a row.
+	 */
+	if ((at < 0) || (at > row->size)) {
+		at = row->size;
+	}
+
+	row->line = realloc(row->line, row->size+2);
+	memmove(&row->line[at+1], &row->line[at], row->size - at + 1);
+	row->size++;
+	row->line[at] = c;
+
+	update_row(row);
+}
+
+
+void
+row_delete_ch(erow *row, int at)
+{
+	if (at < 0 || at >= row->size) {
+		return;
+	}
+	memmove(&row->line[at], &row->line[at+1], row->size+1);
+	row->size--;
+	update_row(row);
+	editor.dirty++;
+}
+
+
+void
+insertch(int16_t c)
+{
+	/*
+	 * insert_ch doesn't need to worry about how to update a
+	 * a row; it can just figure out where the cursor is
+	 * at and what to do.
+	 */
+	if (editor.cury == editor.nrows) {
+		insert_row(editor.nrows, "", 0);
+	}
+
+	row_insert_ch(&editor.row[editor.cury], editor.curx, c);
+	editor.curx++;
+	editor.dirty++;
+}
+
+
+void
+deletech()
+{
+	erow	*row = NULL;
+
+	if (editor.cury == editor.nrows) {
+		return;
+	}
+	
+	if (editor.cury == 0 && editor.curx == 0) {
+		return;
+	}
+
+	row = &editor.row[editor.cury];
+	
+	if (editor.curx > 0) {
+		row_delete_ch(row, editor.curx - 1);
+		editor.curx--;
+	} else {
+		editor.curx = editor.row[editor.cury - 1].size;
+		row_append_row(&editor.row[editor.cury - 1], row->line,
+		    row->size);
+		delete_row(editor.cury);
+		editor.cury--;
+	}
+}
+
+
+void
 open_file(const char *filename)
 {
 	char	*line = NULL;
 	size_t	 linecap = 0;
 	ssize_t	 linelen;
-	FILE	*fp = fopen(filename, "r");
-	if (!fp) {
+	FILE	*fp = NULL;
+
+	free(editor.filename);
+	editor.filename = strdup(filename);
+	
+	editor.dirty = 0;
+	if ((fp = fopen(filename, "r")) == NULL) {
+		if (errno == ENOENT) {
+			return;
+		}
 		die("fopen");
 	}
 
@@ -209,15 +351,101 @@ open_file(const char *filename)
 				linelen--;
 			}
 
-			append_row(line, linelen);
+			insert_row(editor.nrows, line, linelen);
 		}
 	}
 
-	free(editor.filename);
-	editor.filename = strdup(filename);
-
 	free(line);
 	fclose(fp);
+}
+
+
+/*
+ * convert our rows to a buffer; caller must free it.
+ */
+char *
+rows_to_buffer(int *buflen)
+{
+	int	 len = 0;
+	int	 j;
+	char	*buf = NULL;
+	char	*p = NULL;
+
+	for (j = 0; j < editor.nrows; j++) {
+		/* extra byte for newline */
+		len += editor.row[j].size+1;
+	}
+
+	*buflen = len;
+	if (len) {
+		buf = malloc(len);
+		if (buf == NULL) {
+			abort();
+		}
+	}
+	p = buf;
+
+	for (j = 0; j < editor.nrows; j++) {
+		memcpy(p, editor.row[j].line, editor.row[j].size);
+		p += editor.row[j].size;
+		*p++ = '\n';
+	}
+
+	return buf;
+}
+
+
+int
+save_file()
+{
+	int	 fd = -1;
+	int	 len;
+	int	 status = 1; /* will be used as exit code */
+	char	*buf;
+
+	if (editor.filename == NULL) {
+		editor.filename = editor_prompt("Filename: %s");
+		if (editor.filename == NULL) {
+			editor_set_status("Save aborted.");
+			return 0;
+		}
+	}
+
+	buf = rows_to_buffer(&len);
+	if ((fd = open(editor.filename, O_RDWR|O_CREAT, 0644)) == -1) {
+		goto save_exit;
+	}
+
+	if (-1 == ftruncate(fd, len)) {
+		goto save_exit;
+	}
+	
+	if (len == 0) {
+		status = 0;
+		goto save_exit;
+	}
+
+	if ((ssize_t)len != write(fd, buf, len)) {
+		goto save_exit;
+	}
+
+	status = 0;
+
+save_exit:
+	if (fd)		close(fd);
+	if (buf)	free(buf);
+
+	if (status != 0) {
+		buf = strerror(errno);
+		editor_set_status("Error writing %s: %s", editor.filename,
+		    buf);
+	} else {
+		editor_set_status("Wrote %d bytes to %s.", len,
+		    editor.filename); 
+		editor.dirty = 0;
+	}
+	
+	return status;
 }
 
 
@@ -303,6 +531,46 @@ get_keypress()
 }
 
 
+char *
+editor_prompt(char *prompt)
+{
+	size_t	 bufsz = 128;
+	char	*buf = malloc(bufsz);
+	size_t	 buflen = 0;
+	int16_t	 c;
+	
+	buf[0] = '\0';
+	
+	while (1) {
+		editor_set_status(prompt, buf);
+		display_refresh();
+		while ((c = get_keypress()) <= 0) ;
+		if (c == DEL_KEY || c == CTRL_KEY('h') || c == BACKSPACE) {
+			if (buflen != 0) {
+				buf[--buflen] = '\0';	
+			}
+		} else if (c == ESC_KEY) {
+			editor_set_status("");
+			free(buf);
+			return NULL;
+		} else if (c == '\r') {
+			if (buflen != 0) {
+				editor_set_status("");
+				return buf;
+			}
+		} else if (!iscntrl(c) && c < 128) {
+			if (buflen == bufsz - 1) {
+				bufsz *= 2;
+				buf = realloc(buf, bufsz);
+			}
+			
+			buf[buflen++] = c;
+			buf[buflen] = '\0';
+		}
+	}
+}
+
+
 void
 move_cursor(int16_t c)
 {
@@ -381,12 +649,46 @@ move_cursor(int16_t c)
 
 
 void
+newline()
+{
+	erow	*row = NULL;
+
+	if (editor.curx == 0) {
+		insert_row(editor.cury, "", 0);	
+	} else {
+		row = &editor.row[editor.cury];
+		insert_row(editor.cury + 1, &row->line[editor.curx],
+		    row->size - editor.curx);
+		row = &editor.row[editor.cury];
+		row->size = editor.curx;
+		row->line[row->size] = '\0';
+		update_row(row);
+	}
+	
+	editor.cury++;
+	editor.curx = 0;
+}
+
+
+void
 process_kcommand(int16_t c)
 {
 	switch (c) {
 	case 'q':
 	case CTRL_KEY('q'):
+		if (editor.dirty && editor.dirtyex) {
+			editor_set_status("File not saved - C-k q again to quit.");
+			editor.dirtyex = 0;
+			return;
+		}
 		exit(0);
+	case CTRL_KEY('s'):
+	case 's':
+		save_file();
+		break;
+	case CTRL_KEY('w'):
+	case 'w':
+		exit(save_file());
 	case 'd':
 	case CTRL_KEY('\\'):
 		/* sometimes it's nice to dump core */
@@ -394,8 +696,48 @@ process_kcommand(int16_t c)
 		abort();
 	}
 
-	editor.mode = MODE_NORMAL;
+	editor.dirtyex = 1;	
 	return;
+}
+
+void
+process_normal(int16_t c)
+{
+	if (is_arrow_key(c)) {
+		move_cursor(c);
+		return;
+	}
+
+	switch (c) {
+	case '\r':
+		newline();
+		break;
+	case CTRL_KEY('k'):
+		editor.mode = MODE_KCOMMAND;
+		return;
+	case BACKSPACE:
+	case CTRL_KEY('h'):
+	case DEL_KEY:
+		if (c == DEL_KEY) {
+			move_cursor(ARROW_RIGHT);
+		}
+		
+		deletech();
+		break;
+	case CTRL_KEY('l'):
+		/* ignore refresh for now */
+		break;
+	case ESC_KEY:
+		/* TODO(kyle) */
+		break;
+	default:
+		if (isprint(c) || c == TAB_KEY) {
+			insertch(c);
+		}
+		break;
+	}
+	
+	editor.dirtyex = 1;
 }
 
 
@@ -403,6 +745,7 @@ int
 process_keypress()
 {
 	int16_t	c = get_keypress();
+
 
 	/* we didn't actually read a key */
 	if (c <= 0) {
@@ -412,16 +755,11 @@ process_keypress()
 	switch (editor.mode) {
 	case MODE_KCOMMAND:
 		process_kcommand(c);
+		editor.mode = MODE_NORMAL;
 		break;
 	case MODE_NORMAL:
-		if (is_arrow_key(c)) {
-			move_cursor(c);
-		}
-	}
-
-	if (c == CTRL_KEY('k')) {
-		editor.mode = MODE_KCOMMAND;
-		return 1;
+		process_normal(c);
+		break;
 	}
 
 	return 1;
@@ -551,14 +889,14 @@ draw_rows(struct abuf *ab)
 void
 draw_status_bar(struct abuf *ab)
 {
-	static int	updates = 0;
 	char	status[editor.cols];
 	char	rstatus[editor.cols];
 	int	len, rlen;
 
-	len = snprintf(status, sizeof(status), "%.20s - %d lines - %d updates",
-		       editor.filename ? editor.filename : "[no file]",
-		       editor.nrows, updates++);
+	len = snprintf(status, sizeof(status), "%c%cke: %.20s - %d lines",
+	    editor.dirty ? '!' : '-', editor.dirty ? '!' : '-',
+	    editor.filename ? editor.filename : "[no file]",
+	    editor.nrows);
 	rlen = snprintf(rstatus, sizeof(rstatus), "L%d/%d C%d",
 			editor.cury+1, editor.nrows, editor.curx+1);
 
@@ -710,6 +1048,8 @@ init_editor()
 
 	editor.msg[0] = '\0';
 	editor.msgtm = 0;
+	
+	editor.dirty = 0;
 }
 
 
