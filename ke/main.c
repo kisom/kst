@@ -109,6 +109,7 @@ void
 ab_free(struct abuf *buf)
 {
 	free(buf->b);
+	buf->b = NULL;
 }
 
 
@@ -205,7 +206,9 @@ update_row(erow *row)
 	}
 
 	free(row->render);
+	row->render = NULL;
 	row->render = malloc(row->size + (tabs * (TAB_STOP-1)) + 1);
+	assert(row->render != NULL);
 
 	for (j = 0; j < row->size; j++) {
 		if (row->line[j] == '\t') {
@@ -377,6 +380,7 @@ open_file(const char *filename)
 
 	free(editor.filename);
 	editor.filename = strdup(filename);
+	assert(editor.filename != NULL);
 	
 	editor.dirty = 0;
 	if ((fp = fopen(filename, "r")) == NULL) {
@@ -398,6 +402,7 @@ open_file(const char *filename)
 	}
 
 	free(line);
+	line = NULL;
 	fclose(fp);
 }
 
@@ -417,14 +422,14 @@ rows_to_buffer(int *buflen)
 		/* extra byte for newline */
 		len += editor.row[j].size+1;
 	}
+	
+	if (len == 0) {
+		return NULL;
+	}
 
 	*buflen = len;
-	if (len) {
-		buf = malloc(len);
-		if (buf == NULL) {
-			abort();
-		}
-	}
+	buf = malloc(len);
+	assert(buf != NULL);
 	p = buf;
 
 	for (j = 0; j < editor.nrows; j++) {
@@ -1155,6 +1160,9 @@ loop()
 void
 init_editor()
 {
+	editor.cols = 0;
+	editor.rows = 0;
+	
 	if (get_winsz(&editor.rows, &editor.cols) == -1) {
 		die("can't get window size");
 	}
