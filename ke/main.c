@@ -194,7 +194,7 @@ insert_row(int at, char *s, size_t len)
 	
 	if (at < editor.nrows) {
 		memmove(&editor.row[at+1], &editor.row[at],
-		    sizeof(erow) * (editor.rows - at));
+		    sizeof(erow) * (editor.rows - at + 1));
 	}
 	
 	editor.row[at].size = len;

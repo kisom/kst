@@ -2,7 +2,7 @@ BIN :=		ke
 OBJS :=		main.o
 
 LDFLAGS :=
-CFLAGS :=	-pedantic -Wall -Werror -Wextra -O2 -std=c99 -g 
+CFLAGS :=	-pedantic -Wall -Werror -Wextra -O0 -std=c99 -g 
 
 .PHONY: all
 all: build 
