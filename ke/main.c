@@ -237,7 +237,7 @@ insert_row(int at, char *s, size_t len)
 	
 	if (at < editor.nrows) {
 		memmove(&editor.row[at+1], &editor.row[at],
-		    sizeof(erow) * (editor.rows - at + 1));
+		    sizeof(erow) * (editor.nrows - at + 1));
 	}
 	
 	editor.row[at].size = len;
@@ -834,6 +834,13 @@ process_kcommand(int16_t c)
 		abort();
 	case 'f':
 		editor_find();
+		break;
+	case 'm':
+		if (system("make") != 0) {
+			editor_set_status("process failed: %s", strerror(errno));
+		} else {
+			editor_set_status("make: ok");
+		}
 		break;
 	}
 

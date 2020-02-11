@@ -25,5 +25,9 @@ run: $(BIN)
 keypress: keypress.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ keypress.c
 
+.PHONY: install
+install: $(BIN)
+	cp $(BIN) $(HOME)/bin/
+
 %.o: %.c
-	$(CC) $(CFLAGS) -c $@ $<
+
