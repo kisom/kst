@@ -35,7 +35,7 @@
 
 void	 editor_set_status(const char *fmt, ...);
 void	 display_refresh();
-char	*editor_prompt(char *);
+char	*editor_prompt(char *, void (*cb)(char *, int16_t));
 
 
 enum KeyPress {
@@ -147,6 +147,44 @@ get_winsz(int *rows, int *cols)
 	*cols = ws.ws_col;
 	*rows = ws.ws_row;
 	return 0;
+}
+
+
+int
+row_render_to_cursor(erow *row, int cx)
+{
+	int	rx = 0;
+	int	j;
+
+	for (j = 0; j < cx; j++) {
+		if (row->line[j] == '\t') {
+			rx += (TAB_STOP-1) - (rx%TAB_STOP);
+		}
+		rx++;
+	}
+
+	return rx;
+}
+
+
+int
+row_cursor_to_render(erow *row, int rx)
+{
+	int	cur_rx = 0;
+	int	curx = 0;
+	
+	for (curx = 0; curx < row->size; curx++) {
+		if (row->line[curx] == '\t') {
+			cur_rx += (TAB_STOP - 1) - (cur_rx % TAB_STOP);	
+		}
+		cur_rx++;
+		
+		if (cur_rx > rx) {
+			break;
+		}
+	}
+	
+	return curx;
 }
 
 
@@ -404,7 +442,7 @@ save_file()
 	char	*buf;
 
 	if (editor.filename == NULL) {
-		editor.filename = editor_prompt("Filename: %s");
+		editor.filename = editor_prompt("Filename: %s", NULL);
 		if (editor.filename == NULL) {
 			editor_set_status("Save aborted.");
 			return 0;
@@ -532,7 +570,7 @@ get_keypress()
 
 
 char *
-editor_prompt(char *prompt)
+editor_prompt(char *prompt, void (*cb)(char *, int16_t))
 {
 	size_t	 bufsz = 128;
 	char	*buf = malloc(bufsz);
@@ -551,11 +589,17 @@ editor_prompt(char *prompt)
 			}
 		} else if (c == ESC_KEY) {
 			editor_set_status("");
+			if (cb) {
+				cb(buf, c);	
+			}
 			free(buf);
 			return NULL;
 		} else if (c == '\r') {
 			if (buflen != 0) {
 				editor_set_status("");
+				if (cb) {
+					cb(buf, c);
+				}
 				return buf;
 			}
 		} else if (!iscntrl(c) && c < 128) {
@@ -567,7 +611,91 @@ editor_prompt(char *prompt)
 			buf[buflen++] = c;
 			buf[buflen] = '\0';
 		}
+		
+		if (cb) {
+			cb(buf, c);
+		}
 	}
+}
+
+
+void
+editor_find_callback(char *query, int16_t c)
+{
+	static int	 lmatch = -1;
+	static int	 dir = 1;
+	int	 	 i, current;
+	char		*match;
+	erow		*row;
+
+	if (c == '\r' || c == ESC_KEY) {
+		/* reset search */
+		lmatch = -1;
+		dir = 1;
+		return;
+	} else if (c == ARROW_RIGHT || c == ARROW_DOWN) {
+		dir = 1;	
+	} else if (c == ARROW_LEFT || c == ARROW_UP) {
+		dir = -1;
+	} else {
+		lmatch = -1;
+		dir = 1;
+	}
+	
+	if (lmatch == -1) {
+		dir = 1;
+	}
+	current = lmatch;
+	
+	for (i = 0; i < editor.nrows; i++) {
+		current += dir;
+		if (current == -1) {
+			current = editor.nrows - 1;	
+		} else if (current == editor.nrows) {
+			current = 0;	
+		}
+		
+		row = &editor.row[current];
+		match = strstr(row->render, query);
+		if (match) {
+			lmatch = current;
+			editor.cury = current;
+			editor.curx = row_render_to_cursor(row,
+			    match - row->render);
+			/* 
+			 * after this, scroll will put the match line at
+			 * the top of the screen.
+			 */
+			editor.rowoffs = editor.nrows;
+			break;
+		}
+	}
+	
+	display_refresh();	
+}
+
+
+void
+editor_find()
+{
+	char	*query;
+	int	 scx = editor.curx;
+	int	 scy = editor.cury;
+	int	 sco = editor.coloffs;
+	int	 sro = editor.rowoffs;
+	
+	query = editor_prompt("Search (ESC to cancel): %s",
+	    editor_find_callback);
+	if (query) {
+		free(query);
+	} else {
+		editor.curx = scx;
+		editor.cury = scy;
+		editor.coloffs = sco;
+		editor.rowoffs = sro;
+	}
+	
+	display_refresh();
 }
 
 
@@ -694,6 +822,9 @@ process_kcommand(int16_t c)
 		/* sometimes it's nice to dump core */
 		disable_termraw();
 		abort();
+	case 'f':
+		editor_find();
+		break;
 	}
 
 	editor.dirtyex = 1;	
@@ -930,22 +1061,6 @@ draw_message_line(struct abuf *ab)
 	}
 }
 
-
-int
-row_render_to_cursor(erow *row, int cx)
-{
-	int	rx = 0;
-	int	j;
-
-	for (j = 0; j < cx; j++) {
-		if (row->line[j] == '\t') {
-			rx += (TAB_STOP-1) - (rx%TAB_STOP);
-		}
-		rx++;
-	}
-
-	return rx;
-}
 
 void
 scroll()
