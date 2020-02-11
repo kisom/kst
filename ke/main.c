@@ -7,10 +7,12 @@
 #include <sys/ioctl.h>
 #include <ctype.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 
@@ -18,6 +20,7 @@
 #define ESCSEQ		"\x1b["
 #define	CTRL_KEY(key)	((key)&0x1f)
 #define TAB_STOP	8
+#define MSG_TIMEO	5
 
 /*
  * define the keyboard input modes
@@ -61,6 +64,9 @@ struct {
 	int		 nrows;
 	int		 rowoffs, coloffs;
 	erow		*row;
+	char		*filename;
+	char		 msg[80];
+	time_t		 msgtm;
 } editor;
 
 
@@ -207,6 +213,9 @@ open_file(const char *filename)
 		}
 	}
 
+	free(editor.filename);
+	editor.filename = strdup(filename);
+
 	free(line);
 	fclose(fp);
 }
@@ -216,18 +225,20 @@ uint16_t
 is_arrow_key(int16_t c)
 {
 	switch (c) {
-	case ARROW_UP:
 	case ARROW_DOWN:
 	case ARROW_LEFT:
 	case ARROW_RIGHT:
+	case ARROW_UP:
 	case CTRL_KEY('p'):
 	case CTRL_KEY('n'):
 	case CTRL_KEY('f'):
 	case CTRL_KEY('b'):
-	case PG_UP:
-	case PG_DN:
-	case HOME_KEY:
+	case CTRL_KEY('a'):
+	case CTRL_KEY('e'):
 	case END_KEY:
+	case HOME_KEY:
+	case PG_DN:
+	case PG_UP:
 		return 1;
 	};
 
@@ -256,8 +267,9 @@ get_keypress()
 				if (seq[2] == '~') {
 					switch (seq[1]) {
 					case '1': return HOME_KEY;
-					case '2': return END_KEY;
+					case '2': return /* INS_KEY */ c;
 					case '3': return DEL_KEY;
+					case '4': return END_KEY;
 					case '5': return PG_UP;
 					case '6': return PG_DN;
 					case '7': return HOME_KEY;
@@ -347,10 +359,12 @@ move_cursor(int16_t c)
 	}
 
 	case HOME_KEY:
+	case CTRL_KEY('a'):
 		editor.curx = 0;
 		break;
 	case END_KEY:
-		editor.curx = editor.cols - 1;
+	case CTRL_KEY('e'):
+		editor.curx = editor.row[editor.cury].size;
 		break;
 	default:
 		break;
@@ -385,14 +399,14 @@ process_kcommand(int16_t c)
 }
 
 
-void
+int
 process_keypress()
 {
 	int16_t	c = get_keypress();
 
 	/* we didn't actually read a key */
 	if (c <= 0) {
-		return;
+		return 0;
 	}
 
 	switch (editor.mode) {
@@ -407,8 +421,10 @@ process_keypress()
 
 	if (c == CTRL_KEY('k')) {
 		editor.mode = MODE_KCOMMAND;
-		return;
+		return 1;
 	}
+
+	return 1;
 }
 
 
@@ -527,12 +543,54 @@ draw_rows(struct abuf *ab)
 				  buflen);
 		}
 		ab_append(ab, ESCSEQ "K", 3);
-		if (y < (editor.rows - 1)) {
-			ab_append(ab, "\r\n", 2);
-		}
+		ab_append(ab, "\r\n", 2);
 	}
 }
 
+
+void
+draw_status_bar(struct abuf *ab)
+{
+	static int	updates = 0;
+	char	status[editor.cols];
+	char	rstatus[editor.cols];
+	int	len, rlen;
+
+	len = snprintf(status, sizeof(status), "%.20s - %d lines - %d updates",
+		       editor.filename ? editor.filename : "[no file]",
+		       editor.nrows, updates++);
+	rlen = snprintf(rstatus, sizeof(rstatus), "L%d/%d C%d",
+			editor.cury+1, editor.nrows, editor.curx+1);
+
+	ab_append(ab, ESCSEQ "7m", 4);
+	ab_append(ab, status, len);
+	while (len < editor.cols) {
+		if ((editor.cols - len) == rlen) {
+			ab_append(ab, rstatus, rlen);
+			break;
+		}
+		ab_append(ab, " ", 1);
+		len++;
+	}
+	ab_append(ab, ESCSEQ "m", 3);
+	ab_append(ab, "\r\n", 2);
+}
+
+
+void
+draw_message_line(struct abuf *ab)
+{
+	int	len = strlen(editor.msg);
+
+	ab_append(ab, ESCSEQ "K", 3);
+	if (len > editor.cols) {
+		len = editor.cols;
+	}
+
+	if (len && ((time(NULL) - editor.msgtm) < MSG_TIMEO)) {
+		ab_append(ab, editor.msg, len);
+	}
+}
 
 
 int
@@ -591,6 +649,8 @@ display_refresh()
 	display_clear(&ab);
 
 	draw_rows(&ab);
+	draw_status_bar(&ab);
+	draw_message_line(&ab);
 	
 	snprintf(buf, sizeof(buf), ESCSEQ "%d;%dH",
 		 (editor.cury-editor.rowoffs)+1,
@@ -605,11 +665,26 @@ display_refresh()
 
 
 void
+editor_set_status(const char *fmt, ...)
+{
+	va_list	ap;
+
+	va_start(ap, fmt);
+	vsnprintf(editor.msg, sizeof(editor.msg), fmt, ap);
+	va_end(ap);
+
+	editor.msgtm = time(NULL);
+}
+
+
+void
 loop()
 {
+	int	up = 1;
+
 	while (1) {
-		display_refresh();
-		process_keypress();
+		if (up) display_refresh();
+		up = process_keypress();
 	}
 }
 
@@ -623,6 +698,8 @@ init_editor()
 	if (get_winsz(&editor.rows, &editor.cols) == -1) {
 		die("can't get window size");
 	}
+	editor.rows--; /* status bar */
+	editor.rows--; /* message line */
 
 	editor.curx = editor.cury = 0;
 	editor.rx = 0;
@@ -630,6 +707,9 @@ init_editor()
 	editor.nrows = 0;
 	editor.rowoffs = editor.coloffs = 0;
 	editor.row = NULL;
+
+	editor.msg[0] = '\0';
+	editor.msgtm = 0;
 }
 
 
@@ -642,6 +722,8 @@ main(int argc, char *argv[])
 	if (argc > 1) {
 		open_file(argv[1]);
 	}
+
+	editor_set_status("C-k q to exit / C-k d to dump core");
 
 	display_clear(NULL);
 	loop();

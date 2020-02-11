@@ -21,3 +21,6 @@ l		reset mode
 ~		special keys?
 	5: pgup
 	6: pgdn
+m		coloring
+	7m: inverted
+	default: normal

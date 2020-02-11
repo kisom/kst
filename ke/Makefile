@@ -22,5 +22,8 @@ run: $(BIN)
 	reset
 	./$(BIN) notes.txt
 
+keypress: keypress.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ keypress.c
+
 %.o: %.c
 	$(CC) $(CFLAGS) -c $@ $<
