@@ -5,6 +5,7 @@
  * https://viewsourcecode.org/snaptoken/kilo/
  */
 #include <sys/ioctl.h>
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -95,7 +96,7 @@ ab_append(struct abuf *buf, const char *s, int len)
 	char	*nc = realloc(buf->b, buf->len + len);
 
 	if (nc == NULL) {
-		return;
+		abort();
 	}
 
 	memcpy(&nc[buf->len], s, len);
@@ -229,6 +230,7 @@ insert_row(int at, char *s, size_t len)
 	}
 
 	editor.row = realloc(editor.row, sizeof(erow) * (editor.nrows + 1));
+	assert(editor.row != NULL);
 	
 	if (at < editor.nrows) {
 		memmove(&editor.row[at+1], &editor.row[at],
@@ -277,6 +279,7 @@ void
 row_append_row(erow *row, char *s, int len)
 {
 	row->line = realloc(row->line, row->size + len + 1);
+	assert(row->line != NULL);
 	memcpy(&row->line[row->size], s, len);
 	row->size += len;
 	row->line[row->size] = '\0';
@@ -296,6 +299,7 @@ row_insert_ch(erow *row, int at, int16_t c)
 	}
 
 	row->line = realloc(row->line, row->size+2);
+	assert(row->line != NULL);
 	memmove(&row->line[at+1], &row->line[at], row->size - at + 1);
 	row->size++;
 	row->line[at] = c;
@@ -606,6 +610,7 @@ editor_prompt(char *prompt, void (*cb)(char *, int16_t))
 			if (buflen == bufsz - 1) {
 				bufsz *= 2;
 				buf = realloc(buf, bufsz);
+				assert(buf != NULL);
 			}
 			
 			buf[buflen++] = c;
@@ -977,6 +982,8 @@ setup_terminal()
 void
 draw_rows(struct abuf *ab)
 {
+	assert(editor.cols >= 0);
+	
 	char	buf[editor.cols];
 	int	buflen, filerow, padding;
 	int	y;
