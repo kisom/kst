@@ -40,6 +40,8 @@
 void	 editor_set_status(const char *fmt, ...);
 void	 display_refresh();
 char	*editor_prompt(char *, void (*cb)(char *, int16_t));
+void	 init_editor();
+void	 process_normal(int16_t c);
 
 
 enum KeyPress {
@@ -548,6 +550,24 @@ editor_find()
 
 
 void
+editor_openfile()
+{
+	char	*filename;
+
+	/* TODO(kyle): combine with dirutils for tab-completion */
+	filename = editor_prompt("Load file: %s", NULL);
+	if (filename == NULL) {
+		return;
+	}
+
+	free(editor->row);
+	init_editor();
+	
+	open_file(filename);	
+}
+
+
+void
 move_cursor(int16_t c)
 {
 	struct erow	*row;
@@ -667,10 +687,18 @@ process_kcommand(int16_t c)
 	case 'w':
 		exit(save_file());
 	case 'd':
+		while ((editor->row[editor->cury].size - editor->curx) > 0) {
+			process_normal(DEL_KEY);			
+		}
+		break;
 	case CTRL_KEY('\\'):
 		/* sometimes it's nice to dump core */
 		disable_termraw();
 		abort();
+	case 'e':
+	case CTRL_KEY('e'):
+		editor_openfile();
+		break;
 	case 'f':
 		editor_find();
 		break;

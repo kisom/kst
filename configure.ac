@@ -2,8 +2,8 @@ AC_PREREQ([2.59])
 AC_INIT([kst], [1.0.0], [kyle@imap.cc],
 	[libdirutils], [https://hg.sr.ht/~kisom/kst])
 AM_INIT_AUTOMAKE([1.11 foreign subdir-objects])
-AC_CONFIG_SRCDIR([docs/srm.1])
-AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile test/Makefile])
+AC_CONFIG_SRCDIR([doc/srm.1])
+AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile tests/Makefile])
 AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_RANLIB

@@ -45,6 +45,7 @@ main(int argc, char *argv[])
 	argc--;
 	argv++;
 
+	iniparser_line_init(&line);
 	for (i = 0; i < argc; i++) {
 		printf("Processing %s\n", argv[i]);
 		ret = iniparser_open(argv[i], &file);
@@ -92,5 +93,6 @@ exit:
 		iniparser_destroy();
 	}
 
-	return ret==0;
+	return ret!=0;
 }
+

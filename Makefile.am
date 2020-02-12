@@ -6,7 +6,6 @@ TESTS = tests/dirlist_test			\
 dist_noinst_DATA = LICENSE			\
                    testdata			\
                    README			\
-                   example/			\
                    autobuild.sh
 
 test: check

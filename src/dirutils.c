@@ -147,7 +147,7 @@ _rmdirs(const char *path)
 	char			 child[FILENAME_MAX + 1];
 	struct dirent		  *dp;
 	DIR		      *dirp;
-	int		       fail;
+	int		       fail = EXIT_FAILURE;
 
 	if (NULL == (dirp = opendir(path))) {
 		return EXIT_FAILURE;
