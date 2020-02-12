@@ -29,7 +29,7 @@
 #include <sysexits.h>
 #include <unistd.h>
 
-#include <dirutils.h>
+#include <kst/dirutils.h>
 
 static int      test_write_file_helper(const char *, const char *);
 static int      test_touch_file_helper(const char *);
@@ -44,7 +44,7 @@ test_exists(void)
         char            testfil[] = "testdata/testfile";
         char            testnot[] = "testdata/nosuchfile";
         EXISTS_STATUS   ftype;
-
+	
         ftype = path_exists(testdir);
         CU_ASSERT(EXISTS_DIR == ftype);
 
@@ -176,13 +176,18 @@ test_write_file_helper(const char *path, const char *data)
         fail = EXIT_SUCCESS;
         data_len = strlen(data);
         fd = open(path, O_WRONLY|O_CREAT, S_IRUSR| S_IWUSR);
-        if (-1 == fd)
+        if (-1 == fd) {
                 return EXIT_FAILURE;
+	}
         wrsz = write(fd, data, data_len);
-        if (wrsz != data_len)
+	if (wrsz == -1) {
+		fail = EXIT_FAILURE;
+	} else if ((size_t)wrsz != data_len) {
                 fail = EXIT_FAILURE;
-        if (-1 == close(fd))
+	}
+        if (-1 == close(fd)) {
                 fail = EXIT_FAILURE;
+	}
         return fail;
 }
 
@@ -238,7 +243,7 @@ main(void)
                 return EXIT_FAILURE;
         }
 
-        tsuite = CU_add_suite(TEST_SUITE, init_test, cleanup_test);
+        tsuite = CU_add_suite("dirutils_test", init_test, cleanup_test);
         if (NULL == tsuite)
                 fireball();
 

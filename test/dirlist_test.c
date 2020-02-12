@@ -26,7 +26,7 @@
 #include <string.h>
 #include <sysexits.h>
 
-#include <dirlist.h>
+#include <kst/dirlist.h>
 
 
 /*
@@ -179,7 +179,7 @@ main(void)
                 return EXIT_FAILURE;
         }
 
-        tsuite = CU_add_suite(TEST_SUITE, init_test, cleanup_test);
+        tsuite = CU_add_suite("dirlist_test", init_test, cleanup_test);
         if (NULL == tsuite)
                 fireball();
 
