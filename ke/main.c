@@ -18,7 +18,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "abuf.h"
+#include "defs.h"
 
 
 #define	KE_VERSION	"0.0.1-pre"
@@ -60,31 +60,6 @@ enum KeyPress {
 
 void	disable_termraw();
 
-typedef struct erow {
-	char	*line;
-	char	*render;
-
-	int	 size;
-	int	 rsize;
-} erow;
-
-struct {
-	struct termios	 entry_term;
-	int		 rows, cols;
-	int		 curx, cury;
-	int		 rx;
-	int		 mode;
-	int		 nrows;
-	int		 rowoffs, coloffs;
-	erow		*row;
-	char		*filename;
-	int		 dirty;
-	int		 dirtyex;
-	char		 msg[80];
-	time_t		 msgtm;
-} editor;
-
-
 
 void
 die(const char *s)
@@ -125,117 +100,6 @@ get_winsz(int *rows, int *cols)
 }
 
 
-int
-row_render_to_cursor(erow *row, int cx)
-{
-	int	rx = 0;
-	int	j;
-
-	for (j = 0; j < cx; j++) {
-		if (row->line[j] == '\t') {
-			rx += (TAB_STOP-1) - (rx%TAB_STOP);
-		}
-		rx++;
-	}
-
-	return rx;
-}
-
-
-int
-row_cursor_to_render(erow *row, int rx)
-{
-	int	cur_rx = 0;
-	int	curx = 0;
-
-	for (curx = 0; curx < row->size; curx++) {
-		if (row->line[curx] == '\t') {
-			cur_rx += (TAB_STOP - 1) - (cur_rx % TAB_STOP);
-		}
-		cur_rx++;
-
-		if (cur_rx > rx) {
-			break;
-		}
-	}
-
-	return curx;
-}
-
-
-void
-update_row(erow *row)
-{
-	int	i = 0, j;
-	int	tabs = 0;
-
-	/*
-	 * TODO(kyle): I'm not thrilled with this double-render.
-	 */
-	for (j = 0; j < row->size; j++) {
-		if (row->line[j] == '\t') {
-			tabs++;
-		}
-	}
-
-	free(row->render);
-	row->render = NULL;
-	row->render = malloc(row->size + (tabs * (TAB_STOP-1)) + 1);
-	assert(row->render != NULL);
-
-	for (j = 0; j < row->size; j++) {
-		if (row->line[j] == '\t') {
-			do {
-				row->render[i++] = ' ';
-			} while ((i % TAB_STOP) != 0);
-		} else {
-			row->render[i++] = row->line[j];
-		}
-	}
-
-	row->render[i] = '\0';
-	row->rsize = i;
-}
-
-
-void
-insert_row(int at, char *s, size_t len)
-{
-	if (at < 0 || at > editor.nrows) {
-		return;
-	}
-
-	editor.row = realloc(editor.row, sizeof(erow) * (editor.nrows + 1));
-	assert(editor.row != NULL);
-
-	if (at < editor.nrows) {
-		memmove(&editor.row[at+1], &editor.row[at],
-		    sizeof(erow) * (editor.nrows - at + 1));
-	}
-
-	editor.row[at].size = len;
-	editor.row[at].line = malloc(len+1);
-	memcpy(editor.row[at].line, s, len);
-	editor.row[at].line[len] = '\0';
-
-	editor.row[at].rsize = 0;
-	editor.row[at].render = NULL;
-
-	update_row(&editor.row[at]);
-	editor.nrows++;
-}
-
-
-void
-free_row(erow *row)
-{
-	free(row->render);
-	free(row->line);
-	row->render = NULL;
-	row->line  = NULL;
-}
-
-
 void
 delete_row(int at)
 {
@@ -243,29 +107,29 @@ delete_row(int at)
 		return;
 	}
 
-	free_row(&editor.row[at]);
+	erow_free(&editor.row[at]);
 	memmove(&editor.row[at], &editor.row[at+1],
-	    sizeof(erow) * (editor.nrows - at - 1));
+	    sizeof(struct erow) * (editor.nrows - at - 1));
 	editor.nrows--;
 	editor.dirty++;
 }
 
 
 void
-row_append_row(erow *row, char *s, int len)
+row_append_row(struct erow *row, char *s, int len)
 {
 	row->line = realloc(row->line, row->size + len + 1);
 	assert(row->line != NULL);
 	memcpy(&row->line[row->size], s, len);
 	row->size += len;
 	row->line[row->size] = '\0';
-	update_row(row);
+	erow_update(row);
 	editor.dirty++;
 }
 
 
 void
-row_insert_ch(erow *row, int at, int16_t c)
+row_insert_ch(struct erow *row, int at, int16_t c)
 {
 	/*
 	 * row_insert_ch just concerns itself with how to update a row.
@@ -280,19 +144,19 @@ row_insert_ch(erow *row, int at, int16_t c)
 	row->size++;
 	row->line[at] = c;
 
-	update_row(row);
+	erow_update(row);
 }
 
 
 void
-row_delete_ch(erow *row, int at)
+row_delete_ch(struct erow *row, int at)
 {
 	if (at < 0 || at >= row->size) {
 		return;
 	}
 	memmove(&row->line[at], &row->line[at+1], row->size+1);
 	row->size--;
-	update_row(row);
+	erow_update(row);
 	editor.dirty++;
 }
 
@@ -306,7 +170,7 @@ insertch(int16_t c)
 	 * at and what to do.
 	 */
 	if (editor.cury == editor.nrows) {
-		insert_row(editor.nrows, "", 0);
+		erow_insert(editor.nrows, "", 0);
 	}
 
 	row_insert_ch(&editor.row[editor.cury], editor.curx, c);
@@ -318,7 +182,7 @@ insertch(int16_t c)
 void
 deletech()
 {
-	erow	*row = NULL;
+	struct erow	*row = NULL;
 
 	if (editor.cury == editor.nrows) {
 		return;
@@ -370,7 +234,7 @@ open_file(const char *filename)
 				linelen--;
 			}
 
-			insert_row(editor.nrows, line, linelen);
+			erow_insert(editor.nrows, line, linelen);
 		}
 	}
 
@@ -609,7 +473,7 @@ editor_find_callback(char *query, int16_t c)
 	static int	 dir = 1;
 	int	 	 i, current;
 	char		*match;
-	erow		*row;
+	struct erow	*row;
 
 	if (c == '\r' || c == ESC_KEY) {
 		/* reset search */
@@ -643,7 +507,7 @@ editor_find_callback(char *query, int16_t c)
 		if (match) {
 			lmatch = current;
 			editor.cury = current;
-			editor.curx = row_render_to_cursor(row,
+			editor.curx = erow_render_to_cursor(row,
 			    match - row->render);
 			/*
 			 * after this, scroll will put the match line at
@@ -685,9 +549,10 @@ editor_find()
 void
 move_cursor(int16_t c)
 {
-	erow	*row = (editor.cury >= editor.nrows) ?
-		       NULL : &editor.row[editor.cury];
+	struct erow	*row;
 	int	 reps;
+
+	row = (editor.cury >= editor.nrows) ? NULL : &editor.row[editor.cury];
 
 	switch (c) {
 	case ARROW_UP:
@@ -762,18 +627,18 @@ move_cursor(int16_t c)
 void
 newline()
 {
-	erow	*row = NULL;
+	struct erow	*row = NULL;
 
 	if (editor.curx == 0) {
-		insert_row(editor.cury, "", 0);
+		erow_insert(editor.cury, "", 0);
 	} else {
 		row = &editor.row[editor.cury];
-		insert_row(editor.cury + 1, &row->line[editor.curx],
+		erow_insert(editor.cury + 1, &row->line[editor.curx],
 		    row->size - editor.curx);
 		row = &editor.row[editor.cury];
 		row->size = editor.curx;
 		row->line[row->size] = '\0';
-		update_row(row);
+		erow_update(row);
 	}
 
 	editor.cury++;
@@ -1059,7 +924,7 @@ scroll()
 {
 	editor.rx = 0;
 	if (editor.cury < editor.nrows) {
-		editor.rx = row_render_to_cursor(
+		editor.rx = erow_render_to_cursor(
 				&editor.row[editor.cury],
 				editor.curx);
 	}
