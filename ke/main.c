@@ -691,6 +691,11 @@ process_kcommand(int16_t c)
 			process_normal(DEL_KEY);			
 		}
 		break;
+	case BACKSPACE:
+		while (editor->curx > 0) {
+			process_normal(BACKSPACE);
+		}
+		break;
 	case CTRL_KEY('\\'):
 		/* sometimes it's nice to dump core */
 		disable_termraw();
