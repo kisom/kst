@@ -1,0 +1,95 @@
+.Dd November 20, 2012
+.Dt LIBDIRUTILS 3
+.Os
+.Sh NAME
+.Nm libdirutils
+.Nd Python-esque file utility functions for C
+.Sh SYNOPSIS
+.In dirutils.h
+.Ft int
+.Fo makedirs
+.Fa "const char *path"
+.Fc
+.Ft EXISTS_STATUS
+.Fo path_exists
+.Fa "const char *path"
+.Fc
+.Ft int
+.Fo rmdirs
+.Fa "const char *path"
+.Fc
+.Ft int
+.Fo walkpath
+.Fa "const char *root"
+.Fa "dirwalk_action action"
+.Fa "unsigned char mask"
+.Sh DESCRIPTION
+.Nm
+provides a number of convenience functions for working with files and
+directories; as the name implies, it is aimed primarily at directories.
+.Nm makedirs
+provides functionality similar to
+.Ic mkdir -p ,
+creating all the parent directories required. They are created with the
+caller's umask applied to the mode 0777.
+.Nm path_exists
+returns an EXISTS_STATUS value (described below) indicated the status
+of the file.
+.Nm rmdirs
+provides functionality similar to
+.Ic rm -r .
+.Nm walkpath
+walks through a path on disk and calls an action on a file if it
+matches the file type mask. The mask should include some of the
+file types listed in
+.Xr readdir 3 ,
+such as DT_DIR or DT_REG. The convenience definitions
+.Ic FT_ANY
+and
+.Ic FT_STD
+are provided; the former matches any file type and the latter matches
+regular files and directories. Note that this will not follow links.
+The action is defined in the dirutils.h header as
+.Ic typedef int (*dirwalk_action)(const char *) ;
+it takes a NULL-terminated path and does what it will with that path.
+It should return -1 on failure and 0 on success. Note that in the case
+where the path provided to
+.Nm walkdir
+is not a directory, but its type matches the mask, the action will
+still be run on it.
+.Sh RETURN VALUES
+.Nm makedirs
+and
+.Nm rmdirs
+return EXIT_SUCCESS on success and EXIT_FAILURE on failure. The enum
+returned by
+.Nm path_exists
+is defined in
+.Sy dirutils.h
+as:
+.Bd -literal
+enum E_EXISTS_STATUS {
+        EXISTS_ERROR,   /* an error occurred looking at the file */
+        EXISTS_NOENT,   /* the path does not exist */
+        EXISTS_NOPERM,  /* the process does not have appropriate permissions */
+        EXISTS_DIR,     /* the path exists and is a directory */
+        EXISTS_FILE,    /* the path exists and is a regular file */
+        EXISTS_OTHER    /* the path exists and is not a directory or regular */
+                        /*     file. */
+};
+.Ed
+.Sh ERRORS
+The most common error will be a permissions error; it may be prudent to
+compare the value of
+.Nm errno
+before and after calling the function.
+.Sh HISTORY
+.Nm
+was inspired by similar functions in the Python and Go programming languages.
+The author found himself in need of such functions in several projects,
+and decided to write a utility library to handle these functions.
+.Sh AUTHORS
+The
+.Nm
+library was written by
+.An Kyle Isom Aq Mt kyle@tyrfingr.is .

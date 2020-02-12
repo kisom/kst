@@ -1,0 +1,36 @@
+srm - securely wipe files
+--------------------------
+srm is a utility to overwrite files with random data in one or more passes.
+
+
+Dependencies
+------------
+None.
+
+
+Compatibility
+-------------
+srm has been tested on the following operating systems:
+    * OpenBSD (5.1-snap)
+    * OS X (10.8)
+    * Linux (Debian 6.0)
+
+
+Installation
+------------
+make build install
+
+
+Usage
+-----
+srm [-v] [-n number] file list
+
+options:
+        -n <number of passes>: specify number of passes
+                (default is 3 passes)
+        -v: verbose mode. display list of failures and wiped files after wiping
+
+
+Known bugs / caveats
+--------------------
+srm can't recursively remove files, i.e. it can't remove directories.

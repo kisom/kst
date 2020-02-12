@@ -7,7 +7,9 @@
 #ifndef KTE_DEFS_H
 #define KTE_DEFS_H
 
+
 #include <sys/queue.h>
+#include <ncurses.h>
 
 
 #define	KTE_TAB_STOP	8

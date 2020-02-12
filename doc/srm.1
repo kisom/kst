@@ -1,0 +1,84 @@
+.Dd $Mdocdate$
+.Dt SRM 1
+.Os
+.Sh NAME
+.Nm srm
+.Nd securely delete files
+.Sh SYNOPSIS
+.Nm 
+.Op Fl h
+.Op Fl n Ar number
+.Op Fl r
+.Op Fl v
+.Op Fl V
+.Ar files
+.Sh DESCRIPTION
+.Nm
+is a simple secure file deletion tool. It overwrites the file with several
+passes of random data before unlinking it. If no options are specified, Nm
+defaults to three passes.
+.Nm
+supports the following options:
+.Bl -tag -width .Ds
+.It Fl h
+Display a brief help message.
+.It Fl n Ar number
+Specify the number of times to overwrite each target with random data.
+.It Fl r
+Recursive mode. Delete any directories and all subdirectories underneath.
+.It Fl v
+Verbose mode. Displays a list of both files that failed to wipe and files that
+were successfully wiped.
+.It Fl V
+Print version information.
+.El
+.Sh EXIT STATUS
+.Ex -std
+The exit values are standard
+.Xr sysexits 3
+values.
+.Sh EXAMPLES
+Wipe files 
+.Pa foo 
+and 
+.Pa bar 
+with three passes:
+.Dl $ srm foo bar
+Wipe files 
+.Pa baz 
+and 
+.Pa quux
+with ten passes:
+.Dl $ srm -n 10 baz quux
+Wipe all PGP keys, i.e. files with extension 
+.Pa *.asc :
+.Dl $ srm *.asc
+Recursive deletes aren't implemented yet. A workaround is to use
+.Nm
+and 
+.Xr find 1 , 
+for example to delete all
+.Pa *.pgp 
+files:
+.Dl $ find . -iname '*.pgp' -exec srm '{}' \;
+.Sh DIAGNOSTICS
+.Nm 
+uses the standard 
+.Xr err 3 
+facilities to report any errors that occur.
+.Sh SEE ALSO
+The srm page on
+.Lk http://www.tyrfingr.is/projects/srm/ "tyrfinger" .
+.Sh STANDARDS
+.Nm
+conforms to
+.St -ansiC .
+.Sh AUTHORS
+.Nm
+was written by
+.An "Kyle Isom" Aq Mt kyle@tyrfingr.is .
+.Sh BUGS
+None known. Report bugs to the author.
+.Sh LICENSE
+.Nm
+is released under an ISC license.
