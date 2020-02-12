@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -82,28 +83,28 @@ erow_update(struct erow *row)
 void
 erow_insert(int at, char *s, int len)
 {
-	if (at < 0 || at > editor.nrows) {
+	if (at < 0 || at > editor->nrows) {
 		return;
 	}
 
-	editor.row = realloc(editor.row, sizeof(struct erow) * (editor.nrows + 1));
-	assert(editor.row != NULL);
+	editor->row = realloc(editor->row, sizeof(struct erow) * (editor->nrows + 1));
+	assert(editor->row != NULL);
 
-	if (at < editor.nrows) {
-		memmove(&editor.row[at+1], &editor.row[at],
-		    sizeof(struct erow) * (editor.nrows - at + 1));
+	if (at < editor->nrows) {
+		memmove(&editor->row[at+1], &editor->row[at],
+		    sizeof(struct erow) * (editor->nrows - at + 1));
 	}
 
-	editor.row[at].size = len;
-	editor.row[at].line = malloc(len+1);
-	memcpy(editor.row[at].line, s, len);
-	editor.row[at].line[len] = '\0';
+	editor->row[at].size = len;
+	editor->row[at].line = malloc(len+1);
+	memcpy(editor->row[at].line, s, len);
+	editor->row[at].line[len] = '\0';
 
-	editor.row[at].rsize = 0;
-	editor.row[at].render = NULL;
+	editor->row[at].rsize = 0;
+	editor->row[at].render = NULL;
 
-	erow_update(&editor.row[at]);
-	editor.nrows++;
+	erow_update(&editor->row[at]);
+	editor->nrows++;
 }
 
 

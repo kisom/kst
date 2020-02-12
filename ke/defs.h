@@ -31,7 +31,7 @@ struct erow {
 };
 
 
-static struct {
+struct editor_t {
 	struct termios	 entry_term;
 	int		 rows, cols;
 	int		 curx, cury;
@@ -45,7 +45,10 @@ static struct {
 	int		 dirtyex;
 	char		 msg[80];
 	time_t		 msgtm;
-} editor;
+} _editor;
+
+
+static struct editor_t	*editor = &_editor;
 
 
 /*

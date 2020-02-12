@@ -10,7 +10,7 @@ all: build
 .PHONY: build
 build: $(BIN)
 
-$(BIN): $(OBJS)
+$(BIN): $(OBJS) defs.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
 
 .PHONY: clean

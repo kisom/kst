@@ -103,15 +103,15 @@ get_winsz(int *rows, int *cols)
 void
 delete_row(int at)
 {
-	if (at < 0 || at >= editor.nrows) {
+	if (at < 0 || at >= editor->nrows) {
 		return;
 	}
 
-	erow_free(&editor.row[at]);
-	memmove(&editor.row[at], &editor.row[at+1],
-	    sizeof(struct erow) * (editor.nrows - at - 1));
-	editor.nrows--;
-	editor.dirty++;
+	erow_free(&editor->row[at]);
+	memmove(&editor->row[at], &editor->row[at+1],
+	    sizeof(struct erow) * (editor->nrows - at - 1));
+	editor->nrows--;
+	editor->dirty++;
 }
 
 
@@ -124,7 +124,7 @@ row_append_row(struct erow *row, char *s, int len)
 	row->size += len;
 	row->line[row->size] = '\0';
 	erow_update(row);
-	editor.dirty++;
+	editor->dirty++;
 }
 
 
@@ -157,7 +157,7 @@ row_delete_ch(struct erow *row, int at)
 	memmove(&row->line[at], &row->line[at+1], row->size+1);
 	row->size--;
 	erow_update(row);
-	editor.dirty++;
+	editor->dirty++;
 }
 
 
@@ -169,13 +169,13 @@ insertch(int16_t c)
 	 * a row; it can just figure out where the cursor is
 	 * at and what to do.
 	 */
-	if (editor.cury == editor.nrows) {
-		erow_insert(editor.nrows, "", 0);
+	if (editor->cury == editor->nrows) {
+		erow_insert(editor->nrows, "", 0);
 	}
 
-	row_insert_ch(&editor.row[editor.cury], editor.curx, c);
-	editor.curx++;
-	editor.dirty++;
+	row_insert_ch(&editor->row[editor->cury], editor->curx, c);
+	editor->curx++;
+	editor->dirty++;
 }
 
 
@@ -184,25 +184,25 @@ deletech()
 {
 	struct erow	*row = NULL;
 
-	if (editor.cury == editor.nrows) {
+	if (editor->cury == editor->nrows) {
 		return;
 	}
 
-	if (editor.cury == 0 && editor.curx == 0) {
+	if (editor->cury == 0 && editor->curx == 0) {
 		return;
 	}
 
-	row = &editor.row[editor.cury];
+	row = &editor->row[editor->cury];
 
-	if (editor.curx > 0) {
-		row_delete_ch(row, editor.curx - 1);
-		editor.curx--;
+	if (editor->curx > 0) {
+		row_delete_ch(row, editor->curx - 1);
+		editor->curx--;
 	} else {
-		editor.curx = editor.row[editor.cury - 1].size;
-		row_append_row(&editor.row[editor.cury - 1], row->line,
+		editor->curx = editor->row[editor->cury - 1].size;
+		row_append_row(&editor->row[editor->cury - 1], row->line,
 		    row->size);
-		delete_row(editor.cury);
-		editor.cury--;
+		delete_row(editor->cury);
+		editor->cury--;
 	}
 }
 
@@ -215,13 +215,14 @@ open_file(const char *filename)
 	ssize_t	 linelen;
 	FILE	*fp = NULL;
 
-	free(editor.filename);
-	editor.filename = strdup(filename);
-	assert(editor.filename != NULL);
+	free(editor->filename);
+	editor->filename = strdup(filename);
+	assert(editor->filename != NULL);
 
-	editor.dirty = 0;
+	editor->dirty = 0;
 	if ((fp = fopen(filename, "r")) == NULL) {
 		if (errno == ENOENT) {
+			printf("no such file");
 			return;
 		}
 		die("fopen");
@@ -234,7 +235,7 @@ open_file(const char *filename)
 				linelen--;
 			}
 
-			erow_insert(editor.nrows, line, linelen);
+			erow_insert(editor->nrows, line, linelen);
 		}
 	}
 
@@ -255,9 +256,9 @@ rows_to_buffer(int *buflen)
 	char	*buf = NULL;
 	char	*p = NULL;
 
-	for (j = 0; j < editor.nrows; j++) {
+	for (j = 0; j < editor->nrows; j++) {
 		/* extra byte for newline */
-		len += editor.row[j].size+1;
+		len += editor->row[j].size+1;
 	}
 
 	if (len == 0) {
@@ -269,9 +270,9 @@ rows_to_buffer(int *buflen)
 	assert(buf != NULL);
 	p = buf;
 
-	for (j = 0; j < editor.nrows; j++) {
-		memcpy(p, editor.row[j].line, editor.row[j].size);
-		p += editor.row[j].size;
+	for (j = 0; j < editor->nrows; j++) {
+		memcpy(p, editor->row[j].line, editor->row[j].size);
+		p += editor->row[j].size;
 		*p++ = '\n';
 	}
 
@@ -287,16 +288,16 @@ save_file()
 	int	 status = 1; /* will be used as exit code */
 	char	*buf;
 
-	if (editor.filename == NULL) {
-		editor.filename = editor_prompt("Filename: %s", NULL);
-		if (editor.filename == NULL) {
+	if (editor->filename == NULL) {
+		editor->filename = editor_prompt("Filename: %s", NULL);
+		if (editor->filename == NULL) {
 			editor_set_status("Save aborted.");
 			return 0;
 		}
 	}
 
 	buf = rows_to_buffer(&len);
-	if ((fd = open(editor.filename, O_RDWR|O_CREAT, 0644)) == -1) {
+	if ((fd = open(editor->filename, O_RDWR|O_CREAT, 0644)) == -1) {
 		goto save_exit;
 	}
 
@@ -321,12 +322,12 @@ save_exit:
 
 	if (status != 0) {
 		buf = strerror(errno);
-		editor_set_status("Error writing %s: %s", editor.filename,
+		editor_set_status("Error writing %s: %s", editor->filename,
 		    buf);
 	} else {
 		editor_set_status("Wrote %d bytes to %s.", len,
-		    editor.filename);
-		editor.dirty = 0;
+		    editor->filename);
+		editor->dirty = 0;
 	}
 
 	return status;
@@ -494,26 +495,26 @@ editor_find_callback(char *query, int16_t c)
 	}
 	current = lmatch;
 
-	for (i = 0; i < editor.nrows; i++) {
+	for (i = 0; i < editor->nrows; i++) {
 		current += dir;
 		if (current == -1) {
-			current = editor.nrows - 1;
-		} else if (current == editor.nrows) {
+			current = editor->nrows - 1;
+		} else if (current == editor->nrows) {
 			current = 0;
 		}
 
-		row = &editor.row[current];
+		row = &editor->row[current];
 		match = strstr(row->render, query);
 		if (match) {
 			lmatch = current;
-			editor.cury = current;
-			editor.curx = erow_render_to_cursor(row,
+			editor->cury = current;
+			editor->curx = erow_render_to_cursor(row,
 			    match - row->render);
 			/*
 			 * after this, scroll will put the match line at
 			 * the top of the screen.
 			 */
-			editor.rowoffs = editor.nrows;
+			editor->rowoffs = editor->nrows;
 			break;
 		}
 	}
@@ -526,20 +527,20 @@ void
 editor_find()
 {
 	char	*query;
-	int	 scx = editor.curx;
-	int	 scy = editor.cury;
-	int	 sco = editor.coloffs;
-	int	 sro = editor.rowoffs;
+	int	 scx = editor->curx;
+	int	 scy = editor->cury;
+	int	 sco = editor->coloffs;
+	int	 sro = editor->rowoffs;
 
 	query = editor_prompt("Search (ESC to cancel): %s",
 	    editor_find_callback);
 	if (query) {
 		free(query);
 	} else {
-		editor.curx = scx;
-		editor.cury = scy;
-		editor.coloffs = sco;
-		editor.rowoffs = sro;
+		editor->curx = scx;
+		editor->cury = scy;
+		editor->coloffs = sco;
+		editor->rowoffs = sro;
 	}
 
 	display_refresh();
@@ -552,51 +553,51 @@ move_cursor(int16_t c)
 	struct erow	*row;
 	int	 reps;
 
-	row = (editor.cury >= editor.nrows) ? NULL : &editor.row[editor.cury];
+	row = (editor->cury >= editor->nrows) ? NULL : &editor->row[editor->cury];
 
 	switch (c) {
 	case ARROW_UP:
 	case CTRL_KEY('p'):
-		if (editor.cury > 0) {
-			editor.cury--;
+		if (editor->cury > 0) {
+			editor->cury--;
 		}
 		break;
 	case ARROW_DOWN:
 	case CTRL_KEY('n'):
-		if (editor.cury < editor.nrows) {
-			editor.cury++;
+		if (editor->cury < editor->nrows) {
+			editor->cury++;
 		}
 		break;
 	case ARROW_RIGHT:
 	case CTRL_KEY('f'):
-		if (row && editor.curx < row->size) {
-			editor.curx++;
-		} else if (row && editor.curx == row->size) {
-			editor.cury++;
-			editor.curx = 0;
+		if (row && editor->curx < row->size) {
+			editor->curx++;
+		} else if (row && editor->curx == row->size) {
+			editor->cury++;
+			editor->curx = 0;
 		}
 		break;
 	case ARROW_LEFT:
 	case CTRL_KEY('b'):
-		if (editor.curx > 0) {
-			editor.curx--;
-		} else if (editor.cury > 0) {
-			editor.cury--;
-			editor.curx = editor.row[editor.cury].size;
+		if (editor->curx > 0) {
+			editor->curx--;
+		} else if (editor->cury > 0) {
+			editor->cury--;
+			editor->curx = editor->row[editor->cury].size;
 		}
 		break;
 	case PG_UP:
 	case PG_DN: {
 		if (c == PG_UP) {
-			editor.cury = editor.rowoffs;
+			editor->cury = editor->rowoffs;
 		} else if (c == PG_DN) {
-			editor.cury = editor.rowoffs + editor.rows-1;
-			if (editor.cury > editor.nrows) {
-				editor.cury = editor.nrows;
+			editor->cury = editor->rowoffs + editor->rows-1;
+			if (editor->cury > editor->nrows) {
+				editor->cury = editor->nrows;
 			}
 		}
 
-		reps = editor.rows;
+		reps = editor->rows;
 		while (--reps) {
 			move_cursor(c == PG_UP ? ARROW_UP : ARROW_DOWN);
 		}
@@ -604,22 +605,22 @@ move_cursor(int16_t c)
 
 	case HOME_KEY:
 	case CTRL_KEY('a'):
-		editor.curx = 0;
+		editor->curx = 0;
 		break;
 	case END_KEY:
 	case CTRL_KEY('e'):
-		editor.curx = editor.row[editor.cury].size;
+		editor->curx = editor->row[editor->cury].size;
 		break;
 	default:
 		break;
 	}
 
 
-	row = (editor.cury >= editor.nrows) ?
-	      NULL : &editor.row[editor.cury];
+	row = (editor->cury >= editor->nrows) ?
+	      NULL : &editor->row[editor->cury];
 	reps = row ? row->size : 0;
-	if (editor.curx > reps) {
-		editor.curx = reps;
+	if (editor->curx > reps) {
+		editor->curx = reps;
 	}
 }
 
@@ -629,20 +630,20 @@ newline()
 {
 	struct erow	*row = NULL;
 
-	if (editor.curx == 0) {
-		erow_insert(editor.cury, "", 0);
+	if (editor->curx == 0) {
+		erow_insert(editor->cury, "", 0);
 	} else {
-		row = &editor.row[editor.cury];
-		erow_insert(editor.cury + 1, &row->line[editor.curx],
-		    row->size - editor.curx);
-		row = &editor.row[editor.cury];
-		row->size = editor.curx;
+		row = &editor->row[editor->cury];
+		erow_insert(editor->cury + 1, &row->line[editor->curx],
+		    row->size - editor->curx);
+		row = &editor->row[editor->cury];
+		row->size = editor->curx;
 		row->line[row->size] = '\0';
 		erow_update(row);
 	}
 
-	editor.cury++;
-	editor.curx = 0;
+	editor->cury++;
+	editor->curx = 0;
 }
 
 
@@ -652,9 +653,9 @@ process_kcommand(int16_t c)
 	switch (c) {
 	case 'q':
 	case CTRL_KEY('q'):
-		if (editor.dirty && editor.dirtyex) {
+		if (editor->dirty && editor->dirtyex) {
 			editor_set_status("File not saved - C-k q again to quit.");
-			editor.dirtyex = 0;
+			editor->dirtyex = 0;
 			return;
 		}
 		exit(0);
@@ -682,7 +683,7 @@ process_kcommand(int16_t c)
 		break;
 	}
 
-	editor.dirtyex = 1;
+	editor->dirtyex = 1;
 	return;
 }
 
@@ -699,7 +700,7 @@ process_normal(int16_t c)
 		newline();
 		break;
 	case CTRL_KEY('k'):
-		editor.mode = MODE_KCOMMAND;
+		editor->mode = MODE_KCOMMAND;
 		return;
 	case BACKSPACE:
 	case CTRL_KEY('h'):
@@ -723,7 +724,7 @@ process_normal(int16_t c)
 		break;
 	}
 
-	editor.dirtyex = 1;
+	editor->dirtyex = 1;
 }
 
 
@@ -738,10 +739,10 @@ process_keypress()
 		return 0;
 	}
 
-	switch (editor.mode) {
+	switch (editor->mode) {
 	case MODE_KCOMMAND:
 		process_kcommand(c);
-		editor.mode = MODE_NORMAL;
+		editor->mode = MODE_NORMAL;
 		break;
 	case MODE_NORMAL:
 		process_normal(c);
@@ -812,7 +813,7 @@ disable_termraw()
 {
 	display_clear(NULL);
 
-	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &editor.entry_term) == -1) {
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &editor->entry_term) == -1) {
 		die("couldn't disable terminal raw mode");
 	}
 }
@@ -821,7 +822,7 @@ disable_termraw()
 void
 setup_terminal()
 {
-	if (tcgetattr(STDIN_FILENO, &editor.entry_term) == -1) {
+	if (tcgetattr(STDIN_FILENO, &editor->entry_term) == -1) {
 		die("can't snapshot terminal settings");
 	}
 	atexit(disable_termraw);
@@ -832,19 +833,19 @@ setup_terminal()
 void
 draw_rows(struct abuf *ab)
 {
-	assert(editor.cols >= 0);
+	assert(editor->cols >= 0);
 
-	char	buf[editor.cols];
+	char	buf[editor->cols];
 	int	buflen, filerow, padding;
 	int	y;
 
-	for (y = 0; y < editor.rows; y++) {
-		filerow = y + editor.rowoffs;
-		if (filerow >= editor.nrows) {
-			if ((editor.nrows == 0) && (y == editor.rows / 3)) {
+	for (y = 0; y < editor->rows; y++) {
+		filerow = y + editor->rowoffs;
+		if (filerow >= editor->nrows) {
+			if ((editor->nrows == 0) && (y == editor->rows / 3)) {
 				buflen = snprintf(buf, sizeof(buf),
 					"ke k%s", KE_VERSION);
-				padding = (editor.rows - buflen) / 2;
+				padding = (editor->rows - buflen) / 2;
 
 				if (padding) {
 					ab_append(ab, "|", 1);
@@ -857,15 +858,15 @@ draw_rows(struct abuf *ab)
 				ab_append(ab, "|", 1);
 			}
 		} else {
-			buflen = editor.row[filerow].rsize - editor.coloffs;
+			buflen = editor->row[filerow].rsize - editor->coloffs;
 			if (buflen < 0) {
 				buflen = 0;
 			}
 
-			if (buflen > editor.cols) {
-				buflen = editor.cols;
+			if (buflen > editor->cols) {
+				buflen = editor->cols;
 			}
-			ab_append(ab, editor.row[filerow].render+editor.coloffs,
+			ab_append(ab, editor->row[filerow].render+editor->coloffs,
 				  buflen);
 		}
 		ab_append(ab, ESCSEQ "K", 3);
@@ -877,21 +878,21 @@ draw_rows(struct abuf *ab)
 void
 draw_status_bar(struct abuf *ab)
 {
-	char	status[editor.cols];
-	char	rstatus[editor.cols];
+	char	status[editor->cols];
+	char	rstatus[editor->cols];
 	int	len, rlen;
 
 	len = snprintf(status, sizeof(status), "%c%cke: %.20s - %d lines",
-	    editor.dirty ? '!' : '-', editor.dirty ? '!' : '-',
-	    editor.filename ? editor.filename : "[no file]",
-	    editor.nrows);
+	    editor->dirty ? '!' : '-', editor->dirty ? '!' : '-',
+	    editor->filename ? editor->filename : "[no file]",
+	    editor->nrows);
 	rlen = snprintf(rstatus, sizeof(rstatus), "L%d/%d C%d",
-			editor.cury+1, editor.nrows, editor.curx+1);
+			editor->cury+1, editor->nrows, editor->curx+1);
 
 	ab_append(ab, ESCSEQ "7m", 4);
 	ab_append(ab, status, len);
-	while (len < editor.cols) {
-		if ((editor.cols - len) == rlen) {
+	while (len < editor->cols) {
+		if ((editor->cols - len) == rlen) {
 			ab_append(ab, rstatus, rlen);
 			break;
 		}
@@ -906,15 +907,15 @@ draw_status_bar(struct abuf *ab)
 void
 draw_message_line(struct abuf *ab)
 {
-	int	len = strlen(editor.msg);
+	int	len = strlen(editor->msg);
 
 	ab_append(ab, ESCSEQ "K", 3);
-	if (len > editor.cols) {
-		len = editor.cols;
+	if (len > editor->cols) {
+		len = editor->cols;
 	}
 
-	if (len && ((time(NULL) - editor.msgtm) < MSG_TIMEO)) {
-		ab_append(ab, editor.msg, len);
+	if (len && ((time(NULL) - editor->msgtm) < MSG_TIMEO)) {
+		ab_append(ab, editor->msg, len);
 	}
 }
 
@@ -922,27 +923,27 @@ draw_message_line(struct abuf *ab)
 void
 scroll()
 {
-	editor.rx = 0;
-	if (editor.cury < editor.nrows) {
-		editor.rx = erow_render_to_cursor(
-				&editor.row[editor.cury],
-				editor.curx);
+	editor->rx = 0;
+	if (editor->cury < editor->nrows) {
+		editor->rx = erow_render_to_cursor(
+				&editor->row[editor->cury],
+				editor->curx);
 	}
 
-	if (editor.cury < editor.rowoffs) {
-		editor.rowoffs = editor.cury;
+	if (editor->cury < editor->rowoffs) {
+		editor->rowoffs = editor->cury;
 	}
 
-	if (editor.cury >= editor.rowoffs + editor.rows) {
-		editor.rowoffs = editor.cury - editor.rows + 1;
+	if (editor->cury >= editor->rowoffs + editor->rows) {
+		editor->rowoffs = editor->cury - editor->rows + 1;
 	}
 
-	if (editor.rx < editor.coloffs) {
-		editor.coloffs = editor.rx;
+	if (editor->rx < editor->coloffs) {
+		editor->coloffs = editor->rx;
 	}
 
-	if (editor.rx >= editor.coloffs + editor.cols) {
-		editor.coloffs = editor.rx - editor.cols + 1;
+	if (editor->rx >= editor->coloffs + editor->cols) {
+		editor->coloffs = editor->rx - editor->cols + 1;
 	}
 }
 
@@ -963,8 +964,8 @@ display_refresh()
 	draw_message_line(&ab);
 
 	snprintf(buf, sizeof(buf), ESCSEQ "%d;%dH",
-		 (editor.cury-editor.rowoffs)+1,
-		 (editor.rx-editor.coloffs)+1);
+		 (editor->cury-editor->rowoffs)+1,
+		 (editor->rx-editor->coloffs)+1);
 	ab_append(&ab, buf, strnlen(buf, 32));
 	/* ab_append(&ab, ESCSEQ "1;2H", 7); */
 	ab_append(&ab, ESCSEQ "?25h", 6);
@@ -980,10 +981,10 @@ editor_set_status(const char *fmt, ...)
 	va_list	ap;
 
 	va_start(ap, fmt);
-	vsnprintf(editor.msg, sizeof(editor.msg), fmt, ap);
+	vsnprintf(editor->msg, sizeof(editor->msg), fmt, ap);
 	va_end(ap);
 
-	editor.msgtm = time(NULL);
+	editor->msgtm = time(NULL);
 }
 
 
@@ -1005,26 +1006,26 @@ loop()
 void
 init_editor()
 {
-	editor.cols = 0;
-	editor.rows = 0;
+	editor->cols = 0;
+	editor->rows = 0;
 
-	if (get_winsz(&editor.rows, &editor.cols) == -1) {
+	if (get_winsz(&editor->rows, &editor->cols) == -1) {
 		die("can't get window size");
 	}
-	editor.rows--; /* status bar */
-	editor.rows--; /* message line */
+	editor->rows--; /* status bar */
+	editor->rows--; /* message line */
 
-	editor.curx = editor.cury = 0;
-	editor.rx = 0;
+	editor->curx = editor->cury = 0;
+	editor->rx = 0;
 
-	editor.nrows = 0;
-	editor.rowoffs = editor.coloffs = 0;
-	editor.row = NULL;
+	editor->nrows = 0;
+	editor->rowoffs = editor->coloffs = 0;
+	editor->row = NULL;
 
-	editor.msg[0] = '\0';
-	editor.msgtm = 0;
+	editor->msg[0] = '\0';
+	editor->msgtm = 0;
 
-	editor.dirty = 0;
+	editor->dirty = 0;
 }
 
 
