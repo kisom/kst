@@ -40,6 +40,7 @@ static struct {
 
 
 /* terminal.c */
+void	nextline();		/* TODO: destroy this */
 void	terminal_refresh();
 void	terminal_init();
 void	terminal_deinit();
@@ -48,6 +49,9 @@ int	terminal_getch();
 
 /* input.c */
 int	handle_keypress(int c);
+
+/* file_buffer.c */
+void	init_buffer(struct buffer *buf)
 
 
 #endif /* KTE_DEFS_H */

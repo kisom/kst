@@ -2,10 +2,10 @@ BIN :=		ke
 OBJS :=		abuf.o erow.o main.o
 
 LDFLAGS :=
-CFLAGS :=	-pedantic -Wall -Werror -Wextra -O0 -std=c99 -g
+CFLAGS :=	-pedantic -Wall -Werror -Wextra -O2 -std=c99 -g -fno-builtin-memmove
 
 .PHONY: all
-all: build
+all: build install
 
 .PHONY: build
 build: $(BIN)
@@ -27,6 +27,6 @@ keypress: keypress.c
 
 .PHONY: install
 install: $(BIN)
-	cp $(BIN) $(HOME)/bin/
+	install -C $(BIN) $(HOME)/bin/
 
 %.o: %.c

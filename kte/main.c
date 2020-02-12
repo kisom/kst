@@ -11,17 +11,19 @@
 #include "defs.h"
 
 
-void
-deinit()
-{
-	endwin();
-}
+struct buffer	*buffers;
+int		 nbufs;
+int		 cbuf; /* current buffer */
 
 
 int
 main()
 {
 	int	c, up = 1;
+
+	buffers = calloc(1, sizeof(struct buffer));
+	nbufs = 1;
+	cbuf = 0;
 
 	terminal_init();
 	terminal_message("welcome to KTE", 14);

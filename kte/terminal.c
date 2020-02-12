@@ -5,6 +5,18 @@
 #include "defs.h"
 
 
+ */
+static int	cury = 0;
+
+void
+nextline()
+{
+	printf("\t%d", cury);
+	wrefresh(editor.main);
+	cury++;
+}
+
+
 void
 terminal_refresh()
 {
@@ -13,6 +25,11 @@ terminal_refresh()
 
 	if ((time(NULL) - editor.msgtm) > KTE_MSG_TIME) {
 		wrefresh(editor.message);
+	}
+
+	wmove(editor.main, cury, 0);
+	if (cury > LINES-3) {
+		cury = 0;
 	}
 }
 

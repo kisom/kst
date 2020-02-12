@@ -21,7 +21,7 @@
 #include "defs.h"
 
 
-#define	KE_VERSION	"0.9.0"
+#define	KE_VERSION	"0.9.1"
 #define ESCSEQ		"\x1b["
 #define	CTRL_KEY(key)	((key)&0x1f)
 #define TAB_STOP	8
@@ -118,8 +118,8 @@ goto_line()
 		return;
 	}
 
-	editor->cury = lineno;
-	editor->rowoffs = editor->nrows;
+	editor->cury = lineno - 1;
+	editor->rowoffs = editor->cury - (editor->rows / 2);
 }
 
 
@@ -207,7 +207,7 @@ deletech()
 {
 	struct erow	*row = NULL;
 
-	if (editor->cury == editor->nrows) {
+	if (editor->cury >= editor->nrows) {
 		return;
 	}
 
@@ -245,7 +245,7 @@ open_file(const char *filename)
 	editor->dirty = 0;
 	if ((fp = fopen(filename, "r")) == NULL) {
 		if (errno == ENOENT) {
-			printf("no such file");
+			editor_set_status("[new file]");
 			return;
 		}
 		die("fopen");
@@ -311,6 +311,11 @@ save_file()
 	int	 status = 1; /* will be used as exit code */
 	char	*buf;
 
+	if (!editor->dirty) {
+		editor_set_status("No changes to save.");
+		return 0;
+	}
+
 	if (editor->filename == NULL) {
 		editor->filename = editor_prompt("Filename: %s", NULL);
 		if (editor->filename == NULL) {
@@ -341,7 +346,10 @@ save_file()
 
 save_exit:
 	if (fd)		close(fd);
-	if (buf)	free(buf);
+	if (buf) {
+		free(buf);
+		buf = NULL;
+	}
 
 	if (status != 0) {
 		buf = strerror(errno);
@@ -650,6 +658,9 @@ move_cursor(int16_t c)
 		break;
 	case END_KEY:
 	case CTRL_KEY('e'):
+		if (editor->nrows == 0) {
+			break;
+		}
 		editor->curx = editor->row[editor->cury].size;
 		break;
 	default:
@@ -712,6 +723,7 @@ process_kcommand(int16_t c)
 			process_normal(DEL_KEY);			
 		}
 		break;
+	case 'g':
 	case CTRL_KEY('g'):
 		goto_line();
 		break;
@@ -916,6 +928,7 @@ draw_rows(struct abuf *ab)
 				ab_append(ab, "|", 1);
 			}
 		} else {
+			erow_update(&editor->row[filerow]);
 			buflen = editor->row[filerow].rsize - editor->coloffs;
 			if (buflen < 0) {
 				buflen = 0;
@@ -941,7 +954,8 @@ draw_status_bar(struct abuf *ab)
 	int	len, rlen;
 
 	len = snprintf(status, sizeof(status), "%c%cke: %.20s - %d lines",
-	    editor->dirty ? '!' : '-', editor->dirty ? '!' : '-',
+	    editor->mode == MODE_KCOMMAND ? 'K' : 'N',
+	    editor->dirty ? '!' : '-',
 	    editor->filename ? editor->filename : "[no file]",
 	    editor->nrows);
 	rlen = snprintf(rstatus, sizeof(rstatus), "L%d/%d C%d",
@@ -1049,11 +1063,9 @@ editor_set_status(const char *fmt, ...)
 void
 loop()
 {
-	int	up = 1;
-
 	while (1) {
-		if (up) display_refresh();
-		up = process_keypress();
+		display_refresh();
+		while (process_keypress() != 0) ;
 	}
 }
 

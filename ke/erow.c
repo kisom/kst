@@ -92,7 +92,9 @@ erow_update(struct erow *row)
 		}
 	}
 
-	free(row->render);
+	if (row->rsize) {
+		free(row->render);
+	}
 	row->render = NULL;
 	row->render = malloc(row->size + (tabs * (TAB_STOP-1)) + (ctrl * 3) + 1);
 	assert(row->render != NULL);

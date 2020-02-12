@@ -17,7 +17,8 @@ handle_keypress(int c)
 	static int mode = MODE_NORMAL;
 
 	if (mode == MODE_NORMAL) {
-		printf("%02x\t", c);	
+		printf("%02x", c);
+		nextline();
 	}
 
 	return 1;
