@@ -23,12 +23,12 @@ byte_to_hihex(char c)
 static char
 byte_to_lohex(char c)
 {
-	c &= 0x0f;
+	c = c & 0x0f;
 
 	if (c < 10) {
 		return c + 0x30;
 	}
-	return c + 0x41;
+	return c + 0x37;
 }
 
 
@@ -41,6 +41,8 @@ erow_render_to_cursor(struct erow *row, int cx)
 	for (j = 0; j < cx; j++) {
 		if (row->line[j] == '\t') {
 			rx += (TAB_STOP-1) - (rx%TAB_STOP);
+		} else if (row->line[j] < 0x20) {
+			rx += 2;
 		}
 		rx++;
 	}
@@ -58,6 +60,8 @@ erow_cursor_to_render(struct erow *row, int rx)
 	for (curx = 0; curx < row->size; curx++) {
 		if (row->line[curx] == '\t') {
 			cur_rx += (TAB_STOP - 1) - (cur_rx % TAB_STOP);
+		} else if (row->line[curx] < 0x20) {
+			cur_rx += 2;
 		}
 		cur_rx++;
 

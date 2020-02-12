@@ -1,5 +1,7 @@
-[ ] goto-line
+[X] goto-line
 [ ] text-corruption bug
 [ ] alt-modifiers
 [ ] refresh-screen
 [ ] functions -> keymapping?
+[X] rendering: need to skip over control characters like we do with tabs
+[X] control-d -> delete

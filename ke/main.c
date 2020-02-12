@@ -21,7 +21,7 @@
 #include "defs.h"
 
 
-#define	KE_VERSION	"0.0.1-pre"
+#define	KE_VERSION	"0.9.0"
 #define ESCSEQ		"\x1b["
 #define	CTRL_KEY(key)	((key)&0x1f)
 #define TAB_STOP	8
@@ -761,8 +761,9 @@ process_normal(int16_t c)
 		return;
 	case BACKSPACE:
 	case CTRL_KEY('h'):
+	case CTRL_KEY('d'):
 	case DEL_KEY:
-		if (c == DEL_KEY) {
+		if (c == DEL_KEY || c == CTRL_KEY('d')) {
 			move_cursor(ARROW_RIGHT);
 		}
 
@@ -901,7 +902,7 @@ draw_rows(struct abuf *ab)
 		if (filerow >= editor->nrows) {
 			if ((editor->nrows == 0) && (y == editor->rows / 3)) {
 				buflen = snprintf(buf, sizeof(buf),
-					"ke k%s", KE_VERSION);
+					"ke v%s", KE_VERSION);
 				padding = (editor->rows - buflen) / 2;
 
 				if (padding) {
