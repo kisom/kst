@@ -1,10 +1,35 @@
 #include <assert.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 
 #include "defs.h"
+
+
+static char
+byte_to_hihex(char c)
+{
+	c = (c >> 4) & 0xf;
+
+	if (c < 10) {
+		return c + 0x30;
+	}
+	return c + 0x41;
+}
+
+
+static char
+byte_to_lohex(char c)
+{
+	c &= 0x0f;
+
+	if (c < 10) {
+		return c + 0x30;
+	}
+	return c + 0x41;
+}
 
 
 int
@@ -50,6 +75,7 @@ erow_update(struct erow *row)
 {
 	int	i = 0, j;
 	int	tabs = 0;
+	int	ctrl = 0;
 
 	/*
 	 * TODO(kyle): I'm not thrilled with this double-render.
@@ -57,12 +83,14 @@ erow_update(struct erow *row)
 	for (j = 0; j < row->size; j++) {
 		if (row->line[j] == '\t') {
 			tabs++;
+		} else if (!isprint(row->line[j])) {
+			ctrl++;
 		}
 	}
 
 	free(row->render);
 	row->render = NULL;
-	row->render = malloc(row->size + (tabs * (TAB_STOP-1)) + 1);
+	row->render = malloc(row->size + (tabs * (TAB_STOP-1)) + (ctrl * 3) + 1);
 	assert(row->render != NULL);
 
 	for (j = 0; j < row->size; j++) {
@@ -70,6 +98,10 @@ erow_update(struct erow *row)
 			do {
 				row->render[i++] = ' ';
 			} while ((i % TAB_STOP) != 0);
+		} else if (!isprint(row->line[j])) {
+			row->render[i++] = '\\';
+			row->render[i++] = byte_to_hihex(row->line[j]);
+			row->render[i++] = byte_to_lohex(row->line[j]);
 		} else {
 			row->render[i++] = row->line[j];
 		}

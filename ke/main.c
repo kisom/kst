@@ -103,6 +103,27 @@ get_winsz(int *rows, int *cols)
 
 
 void
+goto_line()
+{
+	int	 lineno = 0;
+	char	*query = editor_prompt("Line: %s", NULL);
+
+	if (query == NULL) {
+		return;
+	}
+
+	lineno = atoi(query);
+	if (lineno < 1 || lineno >= editor->nrows) {
+		editor_set_status("Line number must be between 1 and %d.", editor->nrows);
+		return;
+	}
+
+	editor->cury = lineno;
+	editor->rowoffs = editor->nrows;
+}
+
+
+void
 delete_row(int at)
 {
 	if (at < 0 || at >= editor->nrows) {
@@ -175,7 +196,7 @@ insertch(int16_t c)
 		erow_insert(editor->nrows, "", 0);
 	}
 
-	row_insert_ch(&editor->row[editor->cury], editor->curx, c);
+	row_insert_ch(&editor->row[editor->cury], editor->curx, (char)(c & 0xff));
 	editor->curx++;
 	editor->dirty++;
 }
@@ -690,6 +711,9 @@ process_kcommand(int16_t c)
 		while ((editor->row[editor->cury].size - editor->curx) > 0) {
 			process_normal(DEL_KEY);			
 		}
+		break;
+	case CTRL_KEY('g'):
+		goto_line();
 		break;
 	case BACKSPACE:
 		while (editor->curx > 0) {
