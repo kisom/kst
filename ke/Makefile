@@ -29,4 +29,8 @@ keypress: keypress.c
 install: $(BIN)
 	install -C $(BIN) $(HOME)/bin/
 
+.PHONY: cloc
+cloc:
+	cloc main.c defs.h abuf.c erow.c
+
 %.o: %.c

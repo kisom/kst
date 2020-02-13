@@ -1,7 +1,10 @@
 /*
  * kyle's editor
  *
- * first version is a run-through of the kilo editor walkthrough.
+ * first version is a run-through of the kilo editor walkthrough as a
+ * set of guiderails. I've made a lot of changes and did some things
+ * differently. keep an eye for for kte, kyle's text editor - the rewrite
+ * 
  * https://viewsourcecode.org/snaptoken/kilo/
  */
 #include <sys/ioctl.h>
@@ -34,7 +37,7 @@
  */
 #define	MODE_NORMAL	0
 #define	MODE_KCOMMAND	1
-#define	MODE_INSERT	2
+#define	MODE_ESCAPE	2
 
 
 void	 editor_set_status(const char *fmt, ...);
@@ -160,12 +163,13 @@ row_insert_ch(struct erow *row, int at, int16_t c)
 	if ((at < 0) || (at > row->size)) {
 		at = row->size;
 	}
+	assert(c > 0);
 
 	row->line = realloc(row->line, row->size+2);
 	assert(row->line != NULL);
 	memmove(&row->line[at+1], &row->line[at], row->size - at + 1);
 	row->size++;
-	row->line[at] = c;
+	row->line[at] = c & 0xff;
 
 	erow_update(row);
 }
@@ -216,7 +220,6 @@ deletech()
 	}
 
 	row = &editor->row[editor->cury];
-
 	if (editor->curx > 0) {
 		row_delete_ch(row, editor->curx - 1);
 		editor->curx--;
@@ -541,6 +544,9 @@ editor_find_callback(char *query, int16_t c)
 			editor->cury = current;
 			editor->curx = erow_render_to_cursor(row,
 			    match - row->render);
+			if (editor->curx > row->size) {
+				editor->curx = row->size;
+			}
 			/*
 			 * after this, scroll will put the match line at
 			 * the top of the screen.
@@ -756,6 +762,7 @@ process_kcommand(int16_t c)
 	return;
 }
 
+
 void
 process_normal(int16_t c)
 {
@@ -782,10 +789,10 @@ process_normal(int16_t c)
 		deletech();
 		break;
 	case CTRL_KEY('l'):
-		/* ignore refresh for now */
+		display_refresh();
 		break;
 	case ESC_KEY:
-		/* TODO(kyle) */
+		editor->mode = MODE_ESCAPE;
 		break;
 	default:
 		if (isprint(c) || c == TAB_KEY) {
@@ -795,6 +802,21 @@ process_normal(int16_t c)
 	}
 
 	editor->dirtyex = 1;
+}
+
+
+void
+process_escape(int16_t c)
+{
+	switch (c) {
+	case '>':
+		editor->cury = editor->nrows;
+		editor->curx = 0;
+		break;
+	case '<':
+		editor->cury = 0;
+		editor->curx = 0;		
+	}
 }
 
 
@@ -817,6 +839,12 @@ process_keypress()
 	case MODE_NORMAL:
 		process_normal(c);
 		break;
+	case MODE_ESCAPE:
+		process_escape(c);
+		break;
+	default:
+		editor_set_status("we're in the %d-D space now cap'n", editor->mode);
+		editor->mode = MODE_NORMAL;
 	}
 
 	return 1;
@@ -946,6 +974,22 @@ draw_rows(struct abuf *ab)
 }
 
 
+static char
+status_mode_char()
+{
+	switch (editor->mode) {
+	case MODE_NORMAL:
+		return 'N';
+	case MODE_KCOMMAND:
+		return 'K';
+	case MODE_ESCAPE:
+		return 'E';
+	default:
+		return '?';
+	}
+}
+
+
 void
 draw_status_bar(struct abuf *ab)
 {
@@ -954,7 +998,7 @@ draw_status_bar(struct abuf *ab)
 	int	len, rlen;
 
 	len = snprintf(status, sizeof(status), "%c%cke: %.20s - %d lines",
-	    editor->mode == MODE_KCOMMAND ? 'K' : 'N',
+	    status_mode_char(),
 	    editor->dirty ? '!' : '-',
 	    editor->filename ? editor->filename : "[no file]",
 	    editor->nrows);
@@ -1063,9 +1107,20 @@ editor_set_status(const char *fmt, ...)
 void
 loop()
 {
+	int	up = 1; /* update on the first runthrough */
+
 	while (1) {
-		display_refresh();
-		while (process_keypress() != 0) ;
+		if (up) display_refresh();
+
+		/*
+		 * ke should only refresh the display if it has received keyboard
+		 * input; if it has, drain all the inputs. This is useful for
+		 * handling pastes without massive screen flicker.
+		 * 
+		 */
+		if ((up = process_keypress()) != 0) {
+			while (process_keypress()) ;
+		}
 	}
 }
 

@@ -129,7 +129,6 @@ erow_insert(int at, char *s, int len)
 	assert(editor->row != NULL);
 
 	if (at < editor->nrows) {
-		printf("%d, %d\n", at, editor->nrows);
 		memmove(&editor->row[at+1], &editor->row[at],
 		    sizeof(struct erow) * (editor->nrows - at + 1));
 	}
