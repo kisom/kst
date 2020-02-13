@@ -3,8 +3,9 @@
  *
  * first version is a run-through of the kilo editor walkthrough as a
  * set of guiderails. I've made a lot of changes and did some things
- * differently. keep an eye for for kte, kyle's text editor - the rewrite
- * 
+ * differently. keep an eye for for kte, kyle's text editor - the
+ * rewrite that will be coming out... when it comes out.
+ *
  * https://viewsourcecode.org/snaptoken/kilo/
  */
 #include <sys/ioctl.h>
@@ -22,7 +23,6 @@
 #include <unistd.h>
 
 
-#define	KE_VERSION	"0.9.1"
 #define ESCSEQ		"\x1b["
 #define	CTRL_KEY(key)	((key)&0x1f)
 #define TAB_STOP	8
@@ -32,6 +32,7 @@
  * define the keyboard input modes
  * normal: no special mode
  * kcommand: ^k commands
+ * escape: what happens when you hit escape?
  */
 #define	MODE_NORMAL	0
 #define	MODE_KCOMMAND	1
@@ -42,25 +43,93 @@
 
 
 /*
- * abuf is an append buffer.
+ * Function declarations.
  */
+
+/* append buffer */
 struct abuf {
 	char	*b;
 	int	 len;
 };
-
 #define ABUF_INIT	{NULL, 0}
 
+void	 ab_append(struct abuf *buf, const char *s, int len);
+void	 ab_free(struct abuf *buf);
 
-/*
- * erow is an editor row
- */
+
+/* editor row */
 struct erow {
 	char	*line;
 	char	*render;
 
 	int	 size;
 	int	 rsize;
+};
+
+char	 nibble_to_hex(char c);
+int	 erow_render_to_cursor(struct erow *row, int cx);
+int	 erow_cursor_to_render(struct erow *row, int rx);
+void	 erow_update(struct erow *row);
+void	 erow_insert(int at, char *s, int len);
+void	 erow_free(struct erow *row);
+void	 editor_set_status(const char *fmt, ...);
+
+/* miscellaneous */
+void		 die(const char *s);
+int		 get_winsz(int *rows, int *cols);
+void		 goto_line();
+void		 delete_row(int at);
+void		 row_append_row(struct erow *row, char *s, int len);
+void		 row_insert_ch(struct erow *row, int at, int16_t c);
+void		 row_delete_ch(struct erow *row, int at);
+void		 insertch(int16_t c);
+void		 deletech();
+void		 open_file(const char *filename);
+char		*rows_to_buffer(int *buflen);
+int		 save_file();
+uint16_t	 is_arrow_key(int16_t c);
+int16_t		 get_keypress();
+void		 display_refresh();
+void		 editor_find_callback(char *query, int16_t c);
+void		 editor_find();
+char		*editor_prompt(char *, void (*cb)(char *, int16_t));
+void		 editor_openfile();
+void		 move_cursor(int16_t c);
+void		 newline();
+void		 process_kcommand(int16_t c);
+void		 process_normal(int16_t c);
+void		 process_escape(int16_t c);
+int		 process_keypress();
+void		 enable_termraw();
+void		 display_clear(struct abuf *ab);
+void		 disable_termraw();
+void		 setup_terminal();
+void		 draw_rows(struct abuf *ab);
+char		 status_mode_char();
+void		 draw_status_bar(struct abuf *ab);
+void		 draw_message_line(struct abuf *ab);
+void		 scroll();
+void		 display_refresh();
+void		 editor_set_status(const char *fmt, ...);
+void		 loop();
+void		 init_editor();
+void		 process_normal(int16_t c);
+void		 disable_termraw();
+
+
+enum KeyPress {
+	TAB_KEY = 9,
+	ESC_KEY = 27,
+	BACKSPACE = 127,
+	ARROW_LEFT = 1000,
+	ARROW_RIGHT,
+	ARROW_UP,
+	ARROW_DOWN,
+	DEL_KEY,
+	HOME_KEY,
+	END_KEY,
+	PG_UP,
+	PG_DN,
 };
 
 
@@ -79,47 +148,6 @@ struct editor_t {
 	char		 msg[80];
 	time_t		 msgtm;
 } editor;
-
-
-/*
- * Function declarations.
- */
-
-/* append buffer */
-void	 ab_append(struct abuf *buf, const char *s, int len);
-void	 ab_free(struct abuf *buf);
-
-
-/* editor row */
-int	 erow_render_to_cursor(struct erow *row, int cx);
-int	 erow_cursor_to_render(struct erow *row, int rx);
-void	 erow_update(struct erow *row);
-void	 erow_insert(int at, char *s, int len);
-void	 erow_free(struct erow *row);
-void	 editor_set_status(const char *fmt, ...);
-
-/* miscellaneous */
-void	 display_refresh();
-char	*editor_prompt(char *, void (*cb)(char *, int16_t));
-void	 init_editor();
-void	 process_normal(int16_t c);
-void	 disable_termraw();
-
-
-enum KeyPress {
-	TAB_KEY = 9,
-	ESC_KEY = 27,
-	BACKSPACE = 127,
-	ARROW_LEFT = 1000,
-	ARROW_RIGHT,
-	ARROW_UP,
-	ARROW_DOWN,
-	DEL_KEY,
-	HOME_KEY,
-	END_KEY,
-	PG_UP,
-	PG_DN,
-};
 
 
 void
@@ -145,27 +173,14 @@ ab_free(struct abuf *buf)
 }
 
 
-static char
-byte_to_hihex(char c)
+char
+nibble_to_hex(char c)
 {
-	c = (c >> 4) & 0xf;
-
+	c &= 0xf;
 	if (c < 10) {
 		return c + 0x30;
 	}
 	return c + 0x41;
-}
-
-
-static char
-byte_to_lohex(char c)
-{
-	c = c & 0x0f;
-
-	if (c < 10) {
-		return c + 0x30;
-	}
-	return c + 0x37;
 }
 
 
@@ -244,8 +259,8 @@ erow_update(struct erow *row)
 			} while ((i % TAB_STOP) != 0);
 		} else if (!isprint(row->line[j])) {
 			row->render[i++] = '\\';
-			row->render[i++] = byte_to_hihex(row->line[j]);
-			row->render[i++] = byte_to_lohex(row->line[j]);
+			row->render[i++] = nibble_to_hex(row->line[j] >> 4);
+			row->render[i++] = nibble_to_hex(row->line[j] & 0x0f);
 		} else {
 			row->render[i++] = row->line[j];
 		}
@@ -825,8 +840,8 @@ editor_openfile()
 
 	free(editor.row);
 	init_editor();
-	
-	open_file(filename);	
+
+	open_file(filename);
 }
 
 
@@ -954,7 +969,7 @@ process_kcommand(int16_t c)
 		exit(save_file());
 	case 'd':
 		while ((editor.row[editor.cury].size - editor.curx) > 0) {
-			process_normal(DEL_KEY);			
+			process_normal(DEL_KEY);
 		}
 		break;
 	case 'g':
@@ -1043,7 +1058,7 @@ process_escape(int16_t c)
 		break;
 	case '<':
 		editor.cury = 0;
-		editor.curx = 0;		
+		editor.curx = 0;
 	}
 }
 
@@ -1084,8 +1099,7 @@ process_keypress()
  * A text editor needs the terminal to be in raw mode; but the default
  * is to be in canonical (cooked) mode, which is a buffered input mode.
  */
-
-static void
+void
 enable_termraw()
 {
 	struct termios	raw;
@@ -1203,7 +1217,7 @@ draw_rows(struct abuf *ab)
 }
 
 
-static char
+char
 status_mode_char()
 {
 	switch (editor.mode) {
@@ -1345,7 +1359,7 @@ loop()
 		 * ke should only refresh the display if it has received keyboard
 		 * input; if it has, drain all the inputs. This is useful for
 		 * handling pastes without massive screen flicker.
-		 * 
+		 *
 		 */
 		if ((up = process_keypress()) != 0) {
 			while (process_keypress()) ;

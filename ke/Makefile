@@ -1,17 +1,23 @@
 BIN :=		ke
 OBJS :=		main.o
+INSTROOT :=	$(HOME)
+VERSION :=	0.9.2
 
 LDFLAGS :=
-CFLAGS :=	-pedantic -Wall -Werror -Wextra -O2 -std=c99 -g -fno-builtin-memmove
+CFLAGS :=	-pedantic -Wall -Werror -Wextra -O2 -std=c99 -g
+CFLAGS +=	-fno-builtin-memmove -DKE_VERSION="\"$(VERSION)\""
 
 .PHONY: all
-all: build install
+all: build
 
 .PHONY: build
 build: $(BIN)
 
-$(BIN): $(OBJS) defs.h
+$(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
+
+$(BIN).1.txt: $(BIN).1
+	mandoc -Tutf8 $(BIN).1 > $@
 
 .PHONY: clean
 clean:
@@ -26,11 +32,19 @@ keypress: keypress.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ keypress.c
 
 .PHONY: install
-install: $(BIN)
-	install -C $(BIN) $(HOME)/bin/
+install: $(BIN) $(BIN).1
+	install -d $(INSTROOT)/bin/
+	install -d $(INSTROOT)/share/man/man1
+	install -C $(BIN) $(INSTROOT)/bin/
+	install -C $(BIN).1 $(INSTROOT)/share/man/man1/$(BIN).1
+
+.PHONY: upload
+upload: $(BIN).1.txt
+	scp main.c p.kyleisom.net:/var/www/sites/p/ke/$(BIN)_$(VERSION).c.txt
+	scp $(BIN).1.txt p.kyleisom.net:/var/www/sites/p/ke/$(BIN).1.txt
 
 .PHONY: cloc
 cloc:
-	cloc main.c defs.h abuf.c erow.c
+	cloc main.c
 
 %.o: %.c
