@@ -1,0 +1,58 @@
+.Dd $Mdocdate$
+.Dt KE section
+.Os
+.Sh NAME
+.Nm ke
+.Nd Kyle's text editor.
+.Sh SYNPOSIS
+.Nm ke
+.Op Ar files
+.Sh DESCRIPTION
+.Nm
+is Kyle's text editor and is probably ill-suited to everyone else. It
+was inspired by Antirez' kilo text editor by way of someone's writeup
+of the process of writing a text editor from scratch. It has keybindings
+inspired by VDE (and the Wordstar family) and emacs; its spiritual parent
+is
+.Xr mg 1 .
+.Sh KEYBINDINGS
+K-command mode is entered using C-k. This is taken from Wordstar and just
+so happens to be blessed with starting with a most excellent letter of
+grandeur. Many commands work with and without control; for example,
+saving a file can be done with either C-k s or C-k C-s.
+.Pp
+.Bl -tag -width xxxxxxxxxxxx -offset indent
+.It C-k BACKSPACE
+Delete from the cursor to the beginning of the line.
+.It C-k d
+Delete from the cursor to the end of the line.
+.It C-k e
+Edit a new file. Also C-k C-e.
+.It C-k f
+Incremental find.
+.It C-k g
+Go to a specific line. Also C-k C-g.
+.It C-k m
+Run make(1).
+.It C-k q
+exit the editor. Also C-k C-q.
+.It C-k s
+save the file, prompting for a filename if needed. Also C-k C-s.
+.It C-k w
+save the file and exit. Also C-k C-w.
+.It C-k \
+Dump core.
+.El
+.Sh FIND
+The find operation is an incremental search. The up or left arrow keys will
+go to the previous result, while the down or right arrow keys will go to
+the next result. Unfortunately, the search starts from the top of the file
+each time. This is a known bug.
+.Sh EXIT STATUS
+.Ex -std 
+.Sh SEE ALSO
+.Xr mg 1
+.Sh AUTHORS
+.An Kyle Isom Aq Mt kyle@imap.cc
+.Sh CAVEATS
+This is pretty buggy and will probably eat whatever you type.

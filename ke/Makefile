@@ -1,5 +1,5 @@
 BIN :=		ke
-OBJS :=		abuf.o erow.o main.o
+OBJS :=		main.o
 
 LDFLAGS :=
 CFLAGS :=	-pedantic -Wall -Werror -Wextra -O2 -std=c99 -g -fno-builtin-memmove
