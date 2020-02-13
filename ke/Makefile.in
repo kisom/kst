@@ -2,14 +2,14 @@ VERSION :=	0.9.2
 CC ?=		gcc
 TARGET :=	ke
 OBJS :=		main.o
-LIBS :=		-lefence
+LIBS :=
 
-PREFIX ?= /usr/local
-MANDIR ?= /usr/local/man
+PREFIX ?= $PREFIX
+MANDIR ?= $MANDIR
 
 CFLAGS += -Wall -Wextra -pedantic -Wshadow -Werror -std=c99 -g
 CFLAGS += -DKE_VERSION="\"$(TARGET) version $(VERSION)\""
-CFLAGS += -D_DEFAULT_SOURCE -D_POSIX_SOURCE -D_XOPEN_SOURCE
+CFLAGS += OS_CFLAGS
 all: $(TARGET)
 
 clean:

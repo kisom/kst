@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -77,44 +78,43 @@ void	 editor_set_status(const char *fmt, ...);
 /* miscellaneous */
 void		 die(const char *s);
 int		 get_winsz(int *rows, int *cols);
-void		 goto_line();
+void		 goto_line(void);
 void		 delete_row(int at);
 void		 row_append_row(struct erow *row, char *s, int len);
 void		 row_insert_ch(struct erow *row, int at, int16_t c);
 void		 row_delete_ch(struct erow *row, int at);
 void		 insertch(int16_t c);
-void		 deletech();
+void		 deletech(void);
 void		 open_file(const char *filename);
 char		*rows_to_buffer(int *buflen);
-int		 save_file();
+int		 save_file(void);
 uint16_t	 is_arrow_key(int16_t c);
-int16_t		 get_keypress();
-void		 display_refresh();
+int16_t		 get_keypress(void);
+void		 display_refresh(void);
 void		 editor_find_callback(char *query, int16_t c);
-void		 editor_find();
+void		 editor_find(void);
 char		*editor_prompt(char *, void (*cb)(char *, int16_t));
-void		 editor_openfile();
+void		 editor_openfile(void);
 void		 move_cursor(int16_t c);
-void		 newline();
+void		 newline(void);
 void		 process_kcommand(int16_t c);
 void		 process_normal(int16_t c);
 void		 process_escape(int16_t c);
-int		 process_keypress();
-void		 enable_termraw();
+int		 process_keypress(void);
+void		 enable_termraw(void);
 void		 display_clear(struct abuf *ab);
-void		 disable_termraw();
-void		 setup_terminal();
+void		 disable_termraw(void);
+void		 setup_terminal(void);
 void		 draw_rows(struct abuf *ab);
-char		 status_mode_char();
+char		 status_mode_char(void);
 void		 draw_status_bar(struct abuf *ab);
 void		 draw_message_line(struct abuf *ab);
-void		 scroll();
-void		 display_refresh();
+void		 scroll(void);
+void		 display_refresh(void);
 void		 editor_set_status(const char *fmt, ...);
-void		 loop();
-void		 init_editor();
+void		 loop(void);
+void		 init_editor(void);
 void		 process_normal(int16_t c);
-void		 disable_termraw();
 
 
 enum KeyPress {
@@ -133,6 +133,10 @@ enum KeyPress {
 };
 
 
+/*
+ * editor is the global editor state; it should be broken out
+ * to buffers and screen state, probably.
+ */
 struct editor_t {
 	struct termios	 entry_term;
 	int		 rows, cols;
@@ -171,7 +175,6 @@ ab_free(struct abuf *buf)
 	free(buf->b);
 	buf->b = NULL;
 }
-
 
 char
 nibble_to_hex(char c)
@@ -899,6 +902,8 @@ move_cursor(int16_t c)
 		while (--reps) {
 			move_cursor(c == PG_UP ? ARROW_UP : ARROW_DOWN);
 		}
+
+		break;
 	}
 
 	case HOME_KEY:
