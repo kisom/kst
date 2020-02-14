@@ -427,7 +427,7 @@ row_delete_ch(struct erow *row, int at)
 	if (at < 0 || at >= row->size) {
 		return;
 	}
-	memmove(&row->line[at], &row->line[at+1], row->size+1);
+	memmove(&row->line[at], &row->line[at+1], row->size-at);
 	row->size--;
 	erow_update(row);
 	editor.dirty++;
@@ -660,7 +660,6 @@ get_keypress()
 				if (seq[2] == '~') {
 					switch (seq[1]) {
 					case '1': return HOME_KEY;
-					case '2': return /* INS_KEY */ c;
 					case '3': return DEL_KEY;
 					case '4': return END_KEY;
 					case '5': return PG_UP;
