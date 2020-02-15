@@ -23,15 +23,14 @@ install: $(TARGET)
 	install -m 0755 -d $(MANDIR)/man1
 	install -m 0444 $(TARGET).1 $(MANDIR)/man1/$(TARGET).1
 
+clean:
+	-rm -f .*.* *.core *.o *.html tags $(TARGET) $(OBJS)
+	-rm -rf $(TARGET)-$(VERSION)
+	-rm -f $(TARGET)-$(VERSION).tgz
+
 uninstall:
 	-rm -f $(PREFIX)/bin/$(TARGET)
 	-rm -f $(MANDIR)/man1/$(TARGET).1
-
-lint: 
-	-mkdir security
-	-rats -w 3 $(TARGET).[ch] > security/rats.out
-	-lint -fhrs $(TARGET).c > security/lint.out
-	-splint +posixlib $(TARGET).[ch] > security/splint.out
 
 dist: clean
 	-mkdir $(TARGET)-$(VERSION)
