@@ -5,3 +5,8 @@
 [ ] functions -> keymapping?
 [X] rendering: need to skip over control characters like we do with tabs
 [X] control-d -> delete
+
+What would it take for ke to be your daily drives?
++ C-u
++ Alt nav (backspace, delete, f, b, etc)
+
