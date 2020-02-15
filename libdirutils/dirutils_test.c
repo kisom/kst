@@ -37,7 +37,7 @@ static int      test_touch_file_helper(const char *);
 /*
  * test the use of the exists function
  */
-void
+static void
 test_exists(void)
 {
         char            testdir[] = "testdata/testdir";
@@ -55,7 +55,7 @@ test_exists(void)
         CU_ASSERT(EXISTS_NOENT == ftype);
 }
 
-void
+static void
 test_makedirs(void)
 {
         char     testpath[] = "testdata/foo/bar/baz\0";
@@ -73,7 +73,7 @@ test_makedirs(void)
         system("rm -r testdata/foo/");
 }
 
-void
+static void
 test_empty_rmdirs(void)
 {
         char    testpath[20] = "testdata/foo";
@@ -97,7 +97,7 @@ test_empty_rmdirs(void)
 }
 
 
-void
+static void
 test_rmdirs_simple(void)
 {
         char    testpath[] = "testdata/foo";
@@ -124,7 +124,7 @@ test_rmdirs_simple(void)
 }
 
 
-void
+static void
 test_dirutils(void)
 {
         char    testpath[] = "testdata/dirutils";
@@ -203,22 +203,27 @@ test_touch_file_helper(const char *path)
  * required in this code. init_test is called each time a test is run,
  * and cleanup is run after every test.
  */
-int init_test(void)
-{
-        return 0;
-}
-
-int cleanup_test(void)
+static int
+init_test(void)
 {
         return 0;
 }
 
 
 /*
+static int
+cleanup_test(void)
+{
+        return 0;
+}
+*/
+
+
+/*
  * fireball is the code called when adding test fails: cleanup the test
  * registry and exit.
  */
-void
+static void
 fireball(void)
 {
         CU_cleanup_registry();
@@ -243,7 +248,7 @@ main(void)
                 return EXIT_FAILURE;
         }
 
-        tsuite = CU_add_suite("dirutils_test", init_test, cleanup_test);
+        tsuite = CU_add_suite("dirutils_test", init_test, NULL);
         if (NULL == tsuite)
                 fireball();
 

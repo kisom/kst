@@ -2,5 +2,7 @@
 ke/ke
 kte/kte
 .a$
-src/srm
-src/iniparser-test
+srm/srm
+libdirutils/dirutils-test
+Makefile
+libiniparser/iniparser-test

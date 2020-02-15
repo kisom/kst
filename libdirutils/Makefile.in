@@ -1,9 +1,9 @@
-VERSION := 1.1.1
-CC := gcc
-TARGET := libdirutils.a
-OBJS := dirutils.o dirlist.o dirwalk.o
-HEADERS := kst
+VERSION :=	1.1.1
+TARGET :=	libdirutils.a
+OBJS :=		dirutils.o dirlist.o dirwalk.o
+HEADERS :=	kst
 LIBS :=
+TEST_LIBS :=	-L/usr/local/lib -lcunit
 
 PREFIX ?= $PREFIX
 MANDIR ?= $MANDIR
@@ -11,8 +11,7 @@ MANDIR ?= $MANDIR
 CFLAGS += -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-align
 CFLAGS += -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations
 CFLAGS += -Wnested-externs -Winline -Wno-long-long  -Wunused-variable
-CFLAGS += -Wstrict-prototypes -Werror -std=c99 -L/usr/local/lib
-CFLAGS += -I/usr/local/include
+CFLAGS += -Wstrict-prototypes -Werror -std=c99 -I. -I/usr/local/include
 CFLAGS += OS_CFLAGS
 
 all: $(TARGET)
@@ -51,9 +50,8 @@ tags:
 
 test: dirutils-test
 
-TEST_LDFLAGS := -L/usr/local/lib
 dirutils-test:  $(TARGET) dirutils_test.o
-	$(CC) -o $@ $(TEST_LDFLAGS) dirutils_test.o $(TARGET)
+	$(CC) -o $@ dirutils_test.o $(TARGET) $(TEST_LIBS)
 
 .c.o:
 	$(CC) -c ${CFLAGS} $?
