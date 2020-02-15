@@ -11,7 +11,8 @@ MANDIR ?= $MANDIR
 CFLAGS += -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-align
 CFLAGS += -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations
 CFLAGS += -Wnested-externs -Winline -Wno-long-long  -Wunused-variable
-CFLAGS += -Wstrict-prototypes -Werror -ansi 
+CFLAGS += -Wstrict-prototypes -Werror -std=c99 -L/usr/local/lib
+CFLAGS += -I/usr/local/include
 CFLAGS += OS_CFLAGS
 
 all: $(TARGET)
@@ -52,7 +53,7 @@ test: dirutils-test
 
 TEST_LDFLAGS := -L/usr/local/lib
 dirutils-test:  $(TARGET) dirutils_test.o
-	$(CC) -o $@ $(TARGET) $(TEST_LDFLAGS) dirutils_test.o 
+	$(CC) -o $@ $(TEST_LDFLAGS) dirutils_test.o $(TARGET)
 
 .c.o:
 	$(CC) -c ${CFLAGS} $?
