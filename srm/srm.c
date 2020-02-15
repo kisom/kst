@@ -32,7 +32,6 @@
 #define DEFAULT_PASSES  3
 #define DEV_RANDOM      "/dev/urandom"
 #define MAX_CHUNK       4096
-#define SRM_VERSION	"1.3.1"
 
 
 static int       do_wipe(char *, size_t, int);
@@ -364,7 +363,7 @@ usage()
 void
 version()
 {
-        printf("%s\n", SRM_VERSION);
+        printf("%s\n", srm_VERSION);
 }
 
 

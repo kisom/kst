@@ -1,0 +1,54 @@
+VERSION := 1.3.1
+CC := gcc
+TARGET := srm
+OBJS :=
+LIBS :=
+
+PREFIX ?= $PREFIX
+MANDIR ?= $MANDIR
+
+CFLAGS += -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-align
+CFLAGS += -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations
+CFLAGS += -Wnested-externs -Winline -Wno-long-long  -Wunused-variable
+CFLAGS += -Wstrict-prototypes -Werror -ansi -static
+CFLAGS += -D$(TARGET)_VERSION="\"$(TARGET) version $(VERSION)\""
+CFLAGS += OS_CFLAGS
+all: $(TARGET)
+
+$(TARGET): $(TARGET).o $(OBJS)
+	${CC} -o $(TARGET) ${CFLAGS} ${LDFLAGS} $(LIBS) $(OBJS) $(TARGET).o
+
+install: $(TARGET)
+	install -m 0755 $(TARGET)  $(PREFIX)/bin/$(TARGET)
+	install -m 0755 -d $(MANDIR)/man1
+	install -m 0444 $(TARGET).1 $(MANDIR)/man1/$(TARGET).1
+
+uninstall:
+	-rm -f $(PREFIX)/bin/$(TARGET)
+	-rm -f $(MANDIR)/man1/$(TARGET).1
+
+lint: 
+	-mkdir security
+	-rats -w 3 $(TARGET).[ch] > security/rats.out
+	-lint -fhrs $(TARGET).c > security/lint.out
+	-splint +posixlib $(TARGET).[ch] > security/splint.out
+
+dist: clean
+	-mkdir $(TARGET)-$(VERSION)
+	-cp * $(TARGET)-$(VERSION)
+	-cd $(TARGET)-$(VERSION) && make distclean && cd ..
+	-tar czf $(TARGET)-$(VERSION).tgz $(TARGET)-$(VERSION)
+
+distclean: clean
+	-rm -f Makefile
+
+htmldoc:
+	-mandoc -Thtml $(TARGET).1 > $(TARGET).1.html
+
+tags:
+	ctags *.[ch]
+
+.c.o:
+	$(CC) -c ${CFLAGS} $?
+
+.PHONY: clean all install lint uninstall dist distclean htmldoc tags

@@ -760,7 +760,7 @@ editor_find_callback(char *query, int16_t c)
 		lmatch = -1;
 		dir = 1;
 		return;
-	} else if (c == ARROW_RIGHT || c == ARROW_DOWN) {
+	} else if (c == ARROW_RIGHT || c == ARROW_DOWN || c == CTRL_KEY('s')) {
 		dir = 1;
 	} else if (c == ARROW_LEFT || c == ARROW_UP) {
 		dir = -1;
@@ -1038,6 +1038,9 @@ process_normal(int16_t c)
 	case CTRL_KEY('l'):
 		display_refresh();
 		break;
+	case CTRL_KEY('s'):
+		editor_find();
+		break;
 	case ESC_KEY:
 		editor.mode = MODE_ESCAPE;
 		break;
@@ -1250,7 +1253,7 @@ draw_status_bar(struct abuf *ab)
 	    editor.filename ? editor.filename : "[no file]",
 	    editor.nrows);
 	rlen = snprintf(rstatus, sizeof(rstatus), "L%d/%d C%d",
-			editor.cury+1, editor.nrows, editor.curx+1);
+	    editor.cury+1, editor.nrows, editor.curx+1);
 
 	ab_append(ab, ESCSEQ "7m", 4);
 	ab_append(ab, status, len);
