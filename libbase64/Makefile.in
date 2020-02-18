@@ -1,0 +1,59 @@
+VERSION :=	1.0.0
+TARGET :=	libbase64.a
+OBJS :=		base64.o
+HEADERS :=	kst
+LIBS :=
+TEST_LIBS :=	-L/usr/local/lib -lcunit
+
+PREFIX ?= $PREFIX
+MANDIR ?= $MANDIR
+
+CFLAGS += -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-align
+CFLAGS += -Wwrite-strings -Wmissing-prototypes -Wmissing-declarations
+CFLAGS += -Wnested-externs -Winline -Wno-long-long  -Wunused-variable -g
+CFLAGS += -Wstrict-prototypes -Werror -std=c99 -I. -I/usr/local/include
+CFLAGS += OS_CFLAGS
+
+all: $(TARGET)
+
+clean:
+	-rm -f .*.* *.core *.o *.html tags $(TARGET) $(OBJS)
+	-rm -rf $(TARGET)-$(VERSION)
+	-rm -f $(TARGET)-$(VERSION).tgz
+
+$(TARGET): $(OBJS)
+	$(AR) -rcs $@ $(OBJS)
+
+install: $(TARGET)
+	install -m 0755 $(TARGET)  $(PREFIX)/lib/$(TARGET)
+	install -m 0755 -d $(MANDIR)/man1
+	install -m 0444 $(TARGET).3 $(MANDIR)/man3/$(TARGET).3
+
+uninstall:
+	-rm -f $(PREFIX)/lib/$(TARGET)
+	-rm -f $(MANDIR)/man3/$(TARGET).3
+
+dist: clean
+	-mkdir $(TARGET)-$(VERSION)
+	-cp * $(TARGET)-$(VERSION)
+	-cd $(TARGET)-$(VERSION) && make distclean && cd ..
+	-tar czf $(TARGET)-$(VERSION).tgz $(TARGET)-$(VERSION)
+
+distclean: clean
+	-rm -f Makefile
+
+htmldoc:
+	-mandoc -Thtml $(TARGET).1 > $(TARGET).1.html
+
+tags:
+	ctags *.[ch]
+
+test: base64-test
+
+base64-test:  $(TARGET) base64_test.o
+	$(CC) -o $@ base64_test.o $(TARGET) $(TEST_LIBS)
+
+.c.o:
+	$(CC) -c ${CFLAGS} $?
+
+.PHONY: clean all install lint uninstall dist distclean htmldoc tags test
