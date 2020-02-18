@@ -21,7 +21,7 @@ then
 	fi
 	if [ -e "/usr/lib/libefence.a" ]
 	then
-		OS_LIBS="${OS_LIBS} -lefence"
+		OS_LIBS="${OS_LIBS}" # -lefence"
 	fi
 else
 	OS_CFLAGS=""

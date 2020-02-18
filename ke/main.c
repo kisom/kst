@@ -51,8 +51,9 @@
 struct abuf {
 	char	*b;
 	int	 len;
+	int	 cap;
 };
-#define ABUF_INIT	{NULL, 0}
+#define ABUF_INIT	{NULL, 0, 0}
 
 void	 ab_append(struct abuf *buf, const char *s, int len);
 void	 ab_free(struct abuf *buf);
@@ -157,10 +158,19 @@ struct editor_t {
 void
 ab_append(struct abuf *buf, const char *s, int len)
 {
-	char	*nc = realloc(buf->b, buf->len + len);
+	char	*nc = buf->b;
+	int	 sz = buf->len + len;
 
-	if (nc == NULL) {
-		abort();
+	if (sz >= buf->cap) {
+		while (sz > buf->cap) {
+			if (buf->cap == 0) {
+				buf->cap = 1;
+			} else {
+				buf->cap *= 2;
+			}
+		}
+		nc = realloc(nc, buf->cap);
+		assert(nc != NULL);
 	}
 
 	memcpy(&nc[buf->len], s, len);
@@ -174,6 +184,8 @@ ab_free(struct abuf *buf)
 {
 	free(buf->b);
 	buf->b = NULL;
+	buf->len = 0;
+	buf->cap = 0;
 }
 
 char

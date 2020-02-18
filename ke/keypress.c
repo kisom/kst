@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <termios.h>
 #include <unistd.h>
+#include <wctype.h>
 
 
 struct termios orig_termios;
@@ -33,15 +34,16 @@ main()
 {
 	enableRawMode();
 
-	char c;
-	while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q') {
-		if (iscntrl(c)) {
+	wchar_t c;
+	while (read(STDIN_FILENO, &c, sizeof(c)) > 0 && c != 'q') {
+		if (iswcntrl(c)) {
 			printf("$%02x\n", c);
 		} else {
-			printf("$%02x ('%c')\n", c, c);
+			printf("$%02x ('%lc')\n", c, c);
 		}
 	}
 
+	perror("read");
 	return 0;
 }
 
