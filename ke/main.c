@@ -713,7 +713,7 @@ editor_prompt(char *prompt, void (*cb)(char *, int16_t))
 			if (buflen != 0) {
 				buf[--buflen] = '\0';
 			}
-		} else if (c == ESC_KEY) {
+		} else if (c == ESC_KEY || c == CTRL_KEY('g')) {
 			editor_set_status("");
 			if (cb) {
 				cb(buf, c);
@@ -1058,6 +1058,10 @@ process_normal(int16_t c)
 void
 process_escape(int16_t c)
 {
+	struct erow	*row = &editor.row[editor.cury];
+
+	editor_set_status("hi");
+
 	switch (c) {
 	case '>':
 		editor.cury = editor.nrows;
@@ -1066,6 +1070,20 @@ process_escape(int16_t c)
 	case '<':
 		editor.cury = 0;
 		editor.curx = 0;
+		break;
+	case BACKSPACE:
+		if (isalnum(row->line[editor.curx])) {
+			editor_set_status("is alnum");
+			while (editor.curx > 0 && isalnum(row->line[editor.curx])) {
+				process_normal(BACKSPACE);
+			}
+		} else {
+			editor_set_status("not alnum");
+			process_normal(BACKSPACE);
+		}
+		break;
+	default:
+		editor_set_status("unknown ESC key: %04x", c);
 	}
 }
 
