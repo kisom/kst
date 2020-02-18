@@ -29,7 +29,8 @@
 #include <sysexits.h>
 #include <unistd.h>
 
-#include <kst/dirutils.h>
+#include "kst/dirutils.h"
+
 
 static int      test_write_file_helper(const char *, const char *);
 static int      test_touch_file_helper(const char *);
