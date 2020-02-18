@@ -32,8 +32,8 @@
 #include "kst/dirlist.h"
 
 
-static int	  _parent_exists(const char *);
-static int	  _rmdirs(const char *);
+int	  _parent_exists(const char *);
+int	  _rmdirs(const char *);
 
 /*
  * Determines whether a directory exists.
@@ -144,11 +144,12 @@ _parent_exists(const char *path)
 int
 _rmdirs(const char *path)
 {
-	char			 child[FILENAME_MAX + 1];
-	struct dirent		  *dp;
-	DIR		      *dirp;
-	int		       fail = EXIT_FAILURE;
+	char		 child[FILENAME_MAX + 1];
+	struct dirent	*dp;
+	DIR		*dirp;
+	int		 fail = EXIT_SUCCESS;
 
+	printf("_rmdirs(%s)\n", path);
 	if (NULL == (dirp = opendir(path))) {
 		return EXIT_FAILURE;
 	}
@@ -162,8 +163,6 @@ _rmdirs(const char *path)
 			continue;
 		}
 
-		
-		snprintf(child, FILENAME_MAX, "%s/%s", path, dp->d_name);
 		if (DT_DIR == dp->d_type) {
 			fail = _rmdirs(child);
 			if (EXIT_FAILURE == fail) {
@@ -178,12 +177,16 @@ _rmdirs(const char *path)
 			}
 		}
 	}
-	if (-1 == closedir(dirp))
+
+	if (-1 == closedir(dirp)) {
 		return EXIT_FAILURE;
+	}
+
 	if (EXIT_FAILURE == fail) {
 		return EXIT_FAILURE;
 	}
-	else if (-1 == rmdir(path)) {
+
+	if (-1 == rmdir(path)) {
 		return EXIT_FAILURE;
 	}
 	else {
