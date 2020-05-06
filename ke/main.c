@@ -980,8 +980,8 @@ process_kcommand(int16_t c)
 	case 's':
 		save_file();
 		break;
-	case CTRL_KEY('w'):
-	case 'w':
+	case CTRL_KEY('x'):
+	case 'x':
 		exit(save_file());
 	case 'd':
 		while ((editor.row[editor.cury].size - editor.curx) > 0) {
@@ -1222,7 +1222,7 @@ draw_rows(struct abuf *ab)
 		if (filerow >= editor.nrows) {
 			if ((editor.nrows == 0) && (y == editor.rows / 3)) {
 				buflen = snprintf(buf, sizeof(buf),
-					"ke v%s", KE_VERSION);
+					"%s", KE_VERSION);
 				padding = (editor.rows - buflen) / 2;
 
 				if (padding) {
