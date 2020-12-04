@@ -1,0 +1,26 @@
+cskel - skeleton files for new C projects
+-----------------------------------------
+cskel is a skeleton set of files that are useful when making a new C project.
+
+
+What's included
+---------------
+I've got a config.sh and Makefile.in that are used to generate code that will
+build properly on Linux.
+
+
+Caveats
+-------
+This is intended for projects where the codebase resides in the project root,
+i.e. not in a src/ directory. It also isn't set up to build libraries.
+
+
+Author
+------
+Kyle Isom <coder@kyleisom.net>. 
+
+
+See also
+--------
+http://www.tyrfingr.is/cskel/
+
