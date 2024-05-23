@@ -340,7 +340,7 @@ rmdirs(const char *path, size_t passes)
  * print a quick usage message
  */
 void
-usage()
+usage(void)
 {
         version();
         printf("usage: %s [-v] [-n number] files\n", __progname);
@@ -361,7 +361,7 @@ usage()
  * print program version information
  */
 void
-version()
+version(void)
 {
         printf("%s\n", srm_VERSION);
 }
