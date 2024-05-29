@@ -44,7 +44,7 @@
 
 
 /*
- * Function declarations.
+ * Function and struct declarations.
  */
 
 /* append buffer */
@@ -364,7 +364,7 @@ get_winsz(int *rows, int *cols)
 
 
 void
-goto_line()
+goto_line(void)
 {
 	int	 lineno = 0;
 	char	*query = editor_prompt("Line: %s", NULL);
@@ -465,7 +465,7 @@ insertch(int16_t c)
 
 
 void
-deletech()
+deletech(void)
 {
 	struct erow	*row = NULL;
 
@@ -565,7 +565,7 @@ rows_to_buffer(int *buflen)
 
 
 int
-save_file()
+save_file(void)
 {
 	int	 fd = -1;
 	int	 len;
@@ -652,7 +652,7 @@ is_arrow_key(int16_t c)
 
 
 int16_t
-get_keypress()
+get_keypress(void)
 {
 	char	seq[3];
 	char	c = -1;
@@ -818,7 +818,7 @@ editor_find_callback(char *query, int16_t c)
 
 
 void
-editor_find()
+editor_find(void)
 {
 	char	*query;
 	int	 scx = editor.curx;
@@ -842,7 +842,7 @@ editor_find()
 
 
 void
-editor_openfile()
+editor_openfile(void)
 {
 	char	*filename;
 
@@ -943,7 +943,7 @@ move_cursor(int16_t c)
 
 
 void
-newline()
+newline(void)
 {
 	struct erow	*row = NULL;
 
@@ -983,6 +983,9 @@ process_kcommand(int16_t c)
 	case CTRL_KEY('x'):
 	case 'x':
 		exit(save_file());
+	case CTRL_KEY('d'):
+		delete_row(editor.cury);
+		break;
 	case 'd':
 		while ((editor.row[editor.cury].size - editor.curx) > 0) {
 			process_normal(DEL_KEY);
@@ -1101,7 +1104,7 @@ process_escape(int16_t c)
 
 
 int
-process_keypress()
+process_keypress(void)
 {
 	int16_t	c = get_keypress();
 
@@ -1137,7 +1140,7 @@ process_keypress()
  * is to be in canonical (cooked) mode, which is a buffered input mode.
  */
 void
-enable_termraw()
+enable_termraw(void)
 {
 	struct termios	raw;
 
@@ -1187,7 +1190,7 @@ display_clear(struct abuf *ab)
 
 
 void
-disable_termraw()
+disable_termraw(void)
 {
 	display_clear(NULL);
 
@@ -1198,7 +1201,7 @@ disable_termraw()
 
 
 void
-setup_terminal()
+setup_terminal(void)
 {
 	if (tcgetattr(STDIN_FILENO, &editor.entry_term) == -1) {
 		die("can't snapshot terminal settings");
@@ -1255,7 +1258,7 @@ draw_rows(struct abuf *ab)
 
 
 char
-status_mode_char()
+status_mode_char(void)
 {
 	switch (editor.mode) {
 	case MODE_NORMAL:
@@ -1317,7 +1320,7 @@ draw_message_line(struct abuf *ab)
 
 
 void
-scroll()
+scroll(void)
 {
 	editor.rx = 0;
 	if (editor.cury < editor.nrows) {
@@ -1345,7 +1348,7 @@ scroll()
 
 
 void
-display_refresh()
+display_refresh(void)
 {
 	char		buf[32];
 	struct abuf	ab = ABUF_INIT;
@@ -1385,7 +1388,7 @@ editor_set_status(const char *fmt, ...)
 
 
 void
-loop()
+loop(void)
 {
 	int	up = 1; /* update on the first runthrough */
 
@@ -1409,7 +1412,7 @@ loop()
  * init_editor should set up the global editor struct.
  */
 void
-init_editor()
+init_editor(void)
 {
 	editor.cols = 0;
 	editor.rows = 0;
